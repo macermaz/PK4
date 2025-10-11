@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSYKAT - Mobile Therapist Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typed.js/2.0.12/typed.min.js"></script>
+</head>
+<body>
+    <!-- Pantalla de Bloqueo -->
+    <div id="lockScreen" class="lock-screen">
+        <div class="lock-content">
+            <div class="lock-time" id="lockTime"></div>
+            <div class="lock-date" id="lockDate"></div>
+            <div class="lock-psykat">
+                <div class="psykat-logo">
+                    <i class="fas fa-cat"></i>
+                </div>
+                <div class="psykat-text">PSYKAT</div>
+            </div>
+            <div class="lock-hint">Toca dos veces para desbloquear</div>
+        </div>
+    </div>
+
+    <!-- Escritorio PsykatOS -->
+    <div id="desktop" class="desktop hidden">
+        <!-- Barra de estado -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span id="currentTime"></span>
+            </div>
+            <div class="status-right">
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-battery-three-quarters"></i>
+            </div>
+        </div>
+
+        <!-- Grid de aplicaciones -->
+        <div class="app-grid">
+            <div class="app-icon" data-app="mail">
+                <div class="app-icon-container">
+                    <i class="fas fa-envelope"></i>
+                    <div class="notification-badge" id="mailBadge">3</div>
+                </div>
+                <span>Correo</span>
+            </div>
+            
+            <div class="app-icon" data-app="contacts">
+                <div class="app-icon-container">
+                    <i class="fas fa-address-book"></i>
+                    <div class="notification-badge" id="contactsBadge">2</div>
+                </div>
+                <span>Contactos</span>
+            </div>
+            
+            <div class="app-icon" data-app="messaging">
+                <div class="app-icon-container">
+                    <i class="fas fa-comments"></i>
+                    <div class="notification-badge" id="messagingBadge">5</div>
+                </div>
+                <span>Mensajería</span>
+            </div>
+            
+            <div class="app-icon" data-app="tubetok">
+                <div class="app-icon-container">
+                    <i class="fas fa-play-circle"></i>
+                </div>
+                <span>PsykTok</span>
+            </div>
+            
+            <div class="app-icon" data-app="diary">
+                <div class="app-icon-container">
+                    <i class="fas fa-book-medical"></i>
+                </div>
+                <span>Diario</span>
+            </div>
+            
+            <div class="app-icon" data-app="calls">
+                <div class="app-icon-container">
+                    <i class="fas fa-phone"></i>
+                </div>
+                <span>Llamadas</span>
+            </div>
+            
+            <div class="app-icon" data-app="achievements">
+                <div class="app-icon-container">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <span>Logros</span>
+            </div>
+            
+            <div class="app-icon" data-app="settings">
+                <div class="app-icon-container">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <span>Ajustes</span>
+            </div>
+        </div>
+
+        <!-- Dock inferior -->
+        <div class="dock">
+            <div class="dock-icons">
+                <div class="app-icon dock-icon" data-app="messaging">
+                    <div class="app-icon-container">
+                        <i class="fas fa-comments"></i>
+                        <div class="notification-badge">5</div>
+                    </div>
+                </div>
+                <div class="app-icon dock-icon" data-app="contacts">
+                    <div class="app-icon-container">
+                        <i class="fas fa-address-book"></i>
+                    </div>
+                </div>
+                <div class="app-icon dock-icon" data-app="diary">
+                    <div class="app-icon-container">
+                        <i class="fas fa-book-medical"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Views -->
+    <!-- Mensajería -->
+    <div id="messagingView" class="app-view hidden">
+        <div class="app-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="desktop">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <span>Mensajería</span>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-search"></i>
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+        </div>
+        
+        <div class="chat-list" id="chatList">
+            <!-- Chats se generarán dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Vista de Chat Individual -->
+    <div id="chatView" class="app-view hidden">
+        <div class="chat-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="messaging">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="chat-info">
+                    <div class="chat-name" id="chatName">María García</div>
+                    <div class="chat-status" id="chatStatus">En línea</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-phone"></i>
+                <i class="fas fa-video"></i>
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <!-- Mensajes se generarán dinámicamente -->
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="session-counter">
+                <span id="questionCounter">5</span> preguntas restantes
+            </div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
+                <button id="sendButton">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button id="menuButton">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Menú inter-sesiones -->
+        <div id="sessionMenu" class="session-menu hidden">
+            <div class="menu-overlay"></div>
+            <div class="menu-content">
+                <button class="menu-item" id="newSession">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Nueva sesión</span>
+                </button>
+                <button class="menu-item" id="diagnosisTool">
+                    <i class="fas fa-stethoscope"></i>
+                    <span>Herramienta diagnóstico</span>
+                </button>
+                <button class="menu-item" id="saveExit">
+                    <i class="fas fa-save"></i>
+                    <span>Guardar y salir</span>
+                </button>
+                <button class="menu-item" id="cancelCase">
+                    <i class="fas fa-trash"></i>
+                    <span>Anular caso</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Correo -->
+    <div id="mailView" class="app-view hidden">
+        <div class="app-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="desktop">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <span>Correo</span>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-sync"></i>
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+        </div>
+        
+        <div class="mail-list" id="mailList">
+            <!-- Emails se generarán dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Contactos -->
+    <div id="contactsView" class="app-view hidden">
+        <div class="app-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="desktop">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <span>Contactos</span>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-plus"></i>
+                <i class="fas fa-search"></i>
+            </div>
+        </div>
+        
+        <div class="contacts-list" id="contactsList">
+            <!-- Contactos se generarán dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Herramienta de Diagnóstico -->
+    <div id="diagnosisView" class="app-view hidden">
+        <div class="app-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="messaging">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <span>Herramienta Diagnóstico</span>
+            </div>
+            <div class="header-right">
+                <span id="caseName" style="font-size: 0.9rem; opacity: 0.8;">Caso: María García</span>
+            </div>
+        </div>
+        
+        <div class="diagnosis-tabs">
+            <button class="tab-btn active" data-tab="symptoms">Síntomas</button>
+            <button class="tab-btn" data-tab="hypothesis">Hipótesis</button>
+            <button class="tab-btn" data-tab="batteries">Baterías</button>
+            <button class="tab-btn" data-tab="diagnose">Diagnosticar</button>
+        </div>
+        
+        <div class="diagnosis-content">
+            <div id="symptomsTab" class="tab-content active">
+                <div class="symptoms-grid">
+                    <!-- Síntomas se generarán dinámicamente -->
+                </div>
+            </div>
+            
+            <div id="hypothesisTab" class="tab-content hidden">
+                <div class="hypothesis-list">
+                    <!-- Hipótesis se generarán dinámicamente -->
+                </div>
+            </div>
+            
+            <div id="batteriesTab" class="tab-content hidden">
+                <div class="batteries-list">
+                    <!-- Baterías se generarán dinámicamente -->
+                </div>
+            </div>
+            
+            <div id="diagnoseTab" class="tab-content hidden">
+                <div class="diagnose-form">
+                    <select id="dsmDiagnosis">
+                        <option value="">Selecciona un diagnóstico DSM-5-TR</option>
+                        <!-- Opciones se generarán dinámicamente -->
+                    </select>
+                    <div class="diagnosis-summary" id="diagnosisSummary">
+                        <!-- Resumen del diagnóstico -->
+                    </div>
+                    <button id="confirmDiagnosis" class="diagnosis-btn">Confirmar Diagnóstico</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PsykTok -->
+    <div id="tubetokView" class="app-view hidden">
+        <div class="video-container" id="videoContainer">
+            <!-- Videos se generarán dinámicamente -->
+        </div>
+        
+        <div class="video-controls">
+            <button id="likeBtn"><i class="fas fa-heart"></i></button>
+            <button id="shareBtn"><i class="fas fa-share"></i></button>
+            <button id="saveBtn"><i class="fas fa-bookmark"></i></button>
+        </div>
+        
+        <div class="psyktok-sidebar">
+            <div class="video-info">
+                <h3 id="videoTitle">Cómo detectar signos de depresión</h3>
+                <p id="videoAuthor">@psicologa_maria</p>
+                <p id="videoDescription">Aprende a identificar los síntomas principales...</p>
+            </div>
+        </div>
+        
+        <div class="ads-banner" id="adsBanner">
+            <!-- Anuncios se mostrarán aquí -->
+        </div>
+    </div>
+
+    <!-- Diario Clínico -->
+    <div id="diaryView" class="app-view hidden">
+        <div class="app-header">
+            <div class="header-left">
+                <button class="back-btn" data-app="desktop">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <span>Diario Clínico</span>
+            </div>
+            <div class="header-right">
+                <i class="fas fa-search"></i>
+            </div>
+        </div>
+        
+        <div class="diary-tabs">
+            <button class="tab-btn active" data-tab="dsm">DSM-5-TR</button>
+            <button class="tab-btn" data-tab="batteries">Baterías</button>
+            <button class="tab-btn" data-tab="practices">Prácticas</button>
+            <button class="tab-btn" data-tab="saved">Guardados</button>
+        </div>
+        
+        <div class="diary-content">
+            <!-- Contenido se generará dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Resultados -->
+    <div id="resultsView" class="app-view hidden">
+        <div class="results-content">
+            <div class="result-header">
+                <div id="resultIcon" class="result-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h2 id="resultTitle">¡Diagnóstico Correcto!</h2>
+            </div>
+            
+            <div class="xp-section">
+                <div class="xp-gained">+ <span id="xpGained">200</span> XP</div>
+                <div class="xp-bar">
+                    <div class="xp-progress" id="xpProgress"></div>
+                </div>
+                <div class="xp-level">Nivel <span id="currentLevel">5</span></div>
+            </div>
+            
+            <div class="feedback-section" id="feedbackSection">
+                <!-- Retroalimentación se generará dinámicamente -->
+            </div>
+            
+            <div class="diagnosis-details" id="diagnosisDetails">
+                <!-- Detalles del diagnóstico -->
+            </div>
+            
+            <div class="actions-section">
+                <button class="action-btn" id="viewCaseFile">Ver ficha completa</button>
+                <button class="action-btn" id="shareResult">Compartir resultado</button>
+                <button class="action-btn" id="backToDesktop">Volver al inicio</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración de IA -->
+    <div id="aiConfig" class="hidden">
+        <div class="ai-config-content">
+            <h3>Configuración de IA</h3>
+            <div class="config-item">
+                <label>Endpoint n8n:</label>
+                <input type="text" id="n8nEndpoint" value="http://localhost:5678/webhook/ask" placeholder="http://localhost:5678/webhook/ask">
+            </div>
+            <div class="config-item">
+                <label>Modo de IA:</label>
+                <select id="aiMode">
+                    <option value="local">Local (Respuestas simuladas)</option>
+                    <option value="n8n">n8n (IA real)</option>
+                </select>
+            </div>
+            <div class="config-actions">
+                <button id="testConnection">Probar conexión</button>
+                <button id="saveConfig">Guardar configuración</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="ai-integration.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
