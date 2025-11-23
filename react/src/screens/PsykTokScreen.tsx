@@ -7,12 +7,53 @@ import {
   Dimensions,
   Animated,
   FlatList,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
-import { psykTokVideos } from '../data/mockData';
 import Icon from 'react-native-vector-icons/FontAwesome';
+
+// Videos de ejemplo si no existen en mockData
+const psykTokVideos = [
+  {
+    id: '1',
+    title: 'Técnicas de Respiración para la Ansiedad',
+    description: 'Aprende técnicas de respiración diafragmática para manejar la ansiedad',
+    author: 'Dr. María López',
+    category: 'Ansiedad',
+    likes: 15420,
+    duration: '2:30',
+  },
+  {
+    id: '2',
+    title: 'Señales de Depresión',
+    description: 'Identifica los signos tempranos de depresión en tus pacientes',
+    author: 'Psic. Carlos Ruiz',
+    category: 'Depresión',
+    likes: 23100,
+    duration: '3:15',
+  },
+  {
+    id: '3',
+    title: 'Mindfulness en 60 segundos',
+    description: 'Ejercicio rápido de mindfulness para cualquier momento',
+    author: 'Dra. Ana García',
+    category: 'Mindfulness',
+    likes: 45000,
+    duration: '1:00',
+  },
+  {
+    id: '4',
+    title: 'Terapia Cognitivo-Conductual',
+    description: 'Introducción a las técnicas básicas de TCC',
+    author: 'Dr. Pedro Sánchez',
+    category: 'TCC',
+    likes: 32500,
+    duration: '4:20',
+  },
+];
 
 const { width, height } = Dimensions.get('window');
 
@@ -163,11 +204,7 @@ const PsykTokScreen: React.FC = () => {
     const ad = ads[Math.floor(Math.random() * ads.length)];
 
     return (
-      <Animated.View
-        style={[styles.adBanner, { transform: [{ translateY: scrollY }] }]}
-        entering={Animated.spring}
-        exiting={Animated.spring}
-      >
+      <View style={styles.adBanner}>
         <View style={styles.adContent}>
           <View style={styles.adInfo}>
             <Text style={styles.adTitle}>{ad.title}</Text>
@@ -183,7 +220,7 @@ const PsykTokScreen: React.FC = () => {
         >
           <Icon name="times" size={16} color="#666" />
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     );
   };
 

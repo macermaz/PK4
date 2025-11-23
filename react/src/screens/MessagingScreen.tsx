@@ -22,8 +22,10 @@ const MessagingScreen: React.FC = () => {
   const { state, dispatch } = useApp();
   const navigation = useNavigation<MessagingNavigationProp>();
 
-  // Obtener casos activos
-  const activeCases = state.cases.filter(c => c.status === 'active');
+  // Obtener casos activos (incluye 'diagnosed' y 'awaiting_treatment')
+  const activeCases = state.cases.filter(c =>
+    c.status === 'active' || c.status === 'diagnosed' || c.status === 'awaiting_treatment'
+  );
 
   // Formatear último mensaje
   const formatLastMessage = (lastMessage: string): string => {
@@ -125,13 +127,16 @@ const MessagingScreen: React.FC = () => {
       {/* Header */}
       <SafeAreaView style={styles.header}>
         <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={20} color="white" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Mensajería</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerButton}>
               <Icon name="search" size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton}>
-              <Icon name="ellipsis-v" size={20} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -178,12 +183,16 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingTop: 10,
   },
+  backButton: {
+    padding: 8,
+    marginRight: 10,
+  },
   headerTitle: {
+    flex: 1,
     fontSize: 28,
     fontWeight: '700',
     color: 'white',

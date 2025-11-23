@@ -1,119 +1,262 @@
 import { Patient, PsykTokVideo, TestBattery, DSMData } from '../types';
+import { generateRandomPatient, getDisordersByDifficulty } from './clinicalData';
 
-// Pacientes simulados
+// ============================================================================
+// BACKSTORIES DETALLADOS POR TRASTORNO
+// ============================================================================
+export const detailedBackstories: Record<string, string[]> = {
+  // TRASTORNOS DEPRESIVOS
+  'trastorno_depresivo_mayor': [
+    'Hace seis meses perdió su empleo de 15 años tras una reestructuración. Desde entonces, pasa la mayor parte del día en cama. Su pareja está preocupada porque ha dejado de ducharse regularmente y ya no cocina como antes le gustaba.',
+    'Tras el nacimiento de su segundo hijo, comenzó a sentirse "desconectada" de su familia. Describe que ve la vida "a través de un cristal empañado". Su madre tuvo depresión y ella siempre temió heredarla.',
+    'Era el motor de su grupo de amigos, organizaba viajes y quedadas. Después de una ruptura sentimental hace 4 meses, se ha ido aislando progresivamente. Sus amigos dicen que "ya no es el/la mismo/a".',
+    'Profesor universitario que siempre fue apasionado de su trabajo. En los últimos meses ha empezado a cancelar clases, dice que "da igual si enseño o no, los estudiantes no aprenden nada útil". Ha perdido 8 kg sin proponérselo.',
+  ],
+  'distimia': [
+    'Desde adolescente recuerda sentirse "diferente", como si llevara un peso invisible. Nunca ha tenido crisis graves, pero tampoco recuerda la última vez que se sintió genuinamente feliz. "Es mi forma de ser", dice resignado/a.',
+    'Trabaja, cumple, pero todo le cuesta el doble. Sus compañeros la ven como "seria" o "reservada", pero por dentro siente un vacío constante que ningún logro llena. Lleva así más de 3 años.',
+    'Viene porque su nueva pareja le ha dicho que parece "incapaz de disfrutar nada". Reconoce que siempre ha sido pesimista, pero pensaba que era "realismo". Sus padres también eran "personas grises".',
+  ],
+
+  // TRASTORNOS DE ANSIEDAD
+  'trastorno_ansiedad_generalizada': [
+    'Desde que tiene uso de razón, se preocupa "por todo y por nada". De niño/a, sus padres lo/a llamaban "el/la pequeño/a adulto/a" porque siempre anticipaba problemas. Ahora, con 35 años, no puede relajarse ni en vacaciones.',
+    'Ejecutiva de éxito que revisa compulsivamente sus correos a las 3am. Tiene insomnio de conciliación porque su mente no para de darle vueltas a posibles escenarios catastróficos laborales y familiares.',
+    'Madre de dos niños que siente que "algo malo va a pasar" constantemente. Ha empezado a restringir las actividades de sus hijos por miedo a accidentes. Su marido dice que está "agotando a toda la familia".',
+    'Autónomo que ha desarrollado tensión cervical crónica por el estrés. Describe que su cabeza es "como una radio que no se apaga nunca". Toma medicación para dormir pero se despierta igual de tenso.',
+  ],
+  'trastorno_panico': [
+    'El primer ataque ocurrió hace 6 meses en el metro. Pensó que se moría. Desde entonces evita el transporte público, los ascensores y las multitudes. Ha dejado de ir al cine con su pareja.',
+    'Médico de urgencias que tuvo su primer ataque de pánico atendiendo una emergencia. Ahora tiene miedo de volver a trabajar porque "no puede perder el control delante de los pacientes".',
+    'Antes era "la aventurera" del grupo. Desde el primer ataque en un avión hace un año, ha cancelado tres viajes y rechazado un ascenso que implicaba viajar. Vive con miedo constante a "que vuelva a pasar".',
+  ],
+  'fobia_social': [
+    'Brillante programador que ha rechazado promociones porque implican presentar proyectos. En las reuniones siente que todos le miran y juzgan. A veces se inventa excusas para no asistir.',
+    'Estudiante universitaria que ha cambiado de carrera dos veces para evitar las exposiciones orales. Dice que prefiere suspender antes que hablar delante de la clase. Come sola en la biblioteca.',
+    'Desde el instituto tiene "fobia a las quedadas grupales". Puede hablar uno a uno, pero en grupo se bloquea, se ruboriza y tartamudea. Ha rechazado ir a la boda de su mejor amigo como padrino.',
+  ],
+  'agorafobia': [
+    'Hace dos años no salía de casa sin su marido. Ahora ni siquiera puede quedarse sola en casa. La última vez que lo intentó, tuvo que llamar a emergencias creyendo que le daba un infarto.',
+    'Dejó su trabajo porque el trayecto en autobús se volvió imposible. Ahora pide todo a domicilio y solo sale al jardín. Su madre viene a hacerle la compra cada semana.',
+    'Exatleta que tras una lesión empezó a tener ataques de pánico en espacios abiertos. Paradójicamente, ahora los gimnasios cerrados también le dan miedo. "Me he quedado sin sitios seguros".',
+  ],
+
+  // TRAUMA
+  'tept': [
+    'Superviviente de un accidente de tráfico hace 8 meses donde falleció su copiloto. No ha vuelto a conducir, tiene pesadillas cada noche y se sobresalta con cualquier frenazo en la calle.',
+    'Exmilitar que participó en misiones en zona de conflicto. Lleva 2 años de vuelta pero sigue "en alerta". Su pareja dice que grita dormido y que a veces "no está presente" aunque esté en la habitación.',
+    'Víctima de un atraco violento hace un año. Desde entonces, no sale de noche, ha cambiado de barrio y aun así siente que "le siguen". Tiene flashbacks del cuchillo cada vez que ve uno en la cocina.',
+    'Enfermera de UCI durante la pandemia que vio morir a decenas de pacientes. Desarrolló insomnio, irritabilidad y empezó a beber para "desconectar". Ha pedido la baja porque "no puede volver a esa planta".',
+  ],
+  'trastorno_estres_agudo': [
+    'Hace 3 semanas presenció un accidente laboral grave. Desde entonces no duerme, tiene flashbacks constantes y se siente "irreal", como si todo fuera una película.',
+    'Le robaron con violencia hace 10 días. No ha podido volver al trabajo, se sobresalta con cualquier ruido y tiene pesadillas cada noche. Su familia dice que "ya no es el/la mismo/a".',
+  ],
+
+  // TOC
+  'trastorno_obsesivo_compulsivo': [
+    'Dedica 3 horas diarias a rituales de lavado de manos. Tiene la piel agrietada y sangrante. Sabe que es irracional pero si no lo hace, la ansiedad es insoportable. Ha dejado de trabajar.',
+    'Comprueba que ha cerrado la puerta 37 veces exactas antes de irse a dormir. Si pierde la cuenta, empieza de nuevo. Su pareja duerme en otra habitación porque el ritual les despertaba a ambos.',
+    'Profesora que no puede tocar nada que hayan tocado sus alumnos. Usa guantes todo el día y se cambia de ropa al llegar a casa. Sus pensamientos intrusivos son sobre contaminar a su bebé.',
+    'Tiene pensamientos terribles sobre hacer daño a sus seres queridos. Sabe que nunca lo haría, pero la culpa y el miedo le consumen. Ha escondido todos los cuchillos de casa "por si acaso".',
+  ],
+
+  // TRASTORNOS ALIMENTARIOS
+  'anorexia_nerviosa': [
+    'Bailarina de 19 años que pesa 42 kg con 1.68m. Dice que "aún le sobra" y hace 4 horas de ejercicio diario. Su madre la ha traído porque se desmayó en clase.',
+    'Estudiante de medicina que empezó a restringir "para estar más concentrado/a". Ahora come 500 calorías al día, tiene amenorrea y se marea al levantarse. Cuenta cada caloría obsesivamente.',
+    'Tras comentarios sobre su peso en la adolescencia, empezó a hacer dietas. Ahora, con 25 años, pesa lo mismo que a los 12. Su novio amenaza con dejarla si no busca ayuda.',
+  ],
+  'bulimia_nerviosa': [
+    'Por fuera parece "perfecta": delgada, exitosa, sonriente. Por dentro, tiene atracones nocturnos seguidos de vómitos que le han destrozado el esmalte dental. Lleva 5 años ocultándolo.',
+    'Modelo que mantiene su peso mediante purgas después de cada sesión de fotos donde "tiene que comer algo". Tiene callos en los nudillos y evita las revisiones dentales.',
+    'Chef que prueba todo lo que cocina y después "lo compensa". Sus compañeros no sospechan nada. Pasa hambre todo el día para poder "permitirse" los atracones nocturnos.',
+  ],
+  'trastorno_atracon': [
+    'Come grandes cantidades cuando está solo/a, a escondidas, rápidamente y hasta sentir dolor. Después siente vergüenza y culpa. Ha ganado 30 kg en un año pero no se purga.',
+    'Desde la infancia usaba la comida como consuelo. Ahora es su principal forma de gestionar cualquier emoción. Come sin hambre, sin control, y después se odia por ello.',
+  ],
+
+  // TRASTORNOS DE PERSONALIDAD
+  'trastorno_limite_personalidad': [
+    'Sus relaciones son un "todo o nada". Idealiza a sus parejas y después las devalúa. Tiene cicatrices en los brazos de cuando "necesitaba sentir algo". Su expediente incluye 3 ingresos por autolesiones.',
+    'Dice que se siente "vacía" constantemente. Cambia de trabajo, de pareja, de ciudad buscando "algo" que llene ese hueco. Tiene miedo intenso al abandono y hace lo imposible por evitarlo.',
+    'Identidad difusa: no sabe quién es ni qué quiere. Sus emociones van de 0 a 100 en segundos. Ha tenido gestos suicidas cuando sus parejas han intentado dejarla.',
+  ],
+  'trastorno_narcisista_personalidad': [
+    'Viene porque "su esposa le ha obligado". Dice que ella no le entiende y que es "demasiado sensible". En el trabajo le han despedido por "conflictos con compañeros que le tenían envidia".',
+    'Empresario que no entiende por qué su tercer matrimonio ha fracasado. Describe a sus ex como "incapaces de estar a su altura". Interrumpe constantemente y corrige al terapeuta.',
+    'Cirujano exitoso que desprecia a los residentes "mediocres". Tiene problemas con el equipo porque "solo él sabe hacer las cosas bien". Viene porque le han obligado tras quejas formales.',
+  ],
+  'trastorno_evitativo': [
+    'A sus 40 años nunca ha tenido pareja. Rechaza invitaciones sociales por miedo al rechazo. En el trabajo es competente pero invisible: nunca pide ascensos ni participa en reuniones.',
+    'Quiere tener amigos pero está convencida de que "no le caerá bien a nadie". Ensaya mentalmente cada conversación y después se critica por "haberlo hecho mal". Vive aislada.',
+  ],
+  'trastorno_obsesivo_personalidad': [
+    'Abogado perfeccionista que revisa los contratos 20 veces. Nunca delega porque "nadie lo hace bien". Su vida personal es inexistente porque "el trabajo es lo primero".',
+    'Tiene listas para todo: listas de tareas, listas de listas. No puede tirar nada "por si acaso". Su casa está ordenada milimétricamente pero no puede disfrutar de ella por estar siempre limpiando.',
+  ],
+
+  // TRASTORNOS BIPOLARES
+  'trastorno_bipolar_i': [
+    'En su último episodio maníaco gastó 50.000€ en "inversiones seguras", dejó su trabajo para "montar un imperio" y durmió 2 horas diarias durante 3 semanas. Ahora está en depresión profunda y arrepentido.',
+    'Artista que en sus fases "altas" produce obras geniales pero también conductas de riesgo: sexo sin protección, conducción temeraria, peleas. Las depresiones le dejan semanas sin poder levantarse.',
+    'Empresaria que en manía fundó 3 empresas en un mes, todas fracasadas. Su familia ha tenido que intervenir legalmente para proteger su patrimonio. No tiene conciencia de enfermedad.',
+  ],
+  'trastorno_bipolar_ii': [
+    'Tiene depresiones recurrentes que responden mal a antidepresivos. Mirando atrás, identifica épocas donde dormía poco, trabajaba mucho y "estaba eufórica" sin consecuencias graves.',
+    'Escritor que describe épocas donde "las ideas fluyen" y escribe 12 horas seguidas. Después vienen meses donde no puede ni leer. Nunca ha tenido una manía franca.',
+  ],
+  'ciclotimia': [
+    'Desde adolescente tiene "altibajos" constantes. Semanas donde es el alma de la fiesta y semanas donde cancela todos los planes. Sus amigos dicen que "nunca saben qué versión va a aparecer".',
+  ],
+
+  // SUSTANCIAS
+  'trastorno_consumo_alcohol': [
+    'Empezó bebiendo "socialmente" pero ahora necesita alcohol para funcionar. Bebe a escondidas en el trabajo, ha tenido temblores matutinos y su hígado está afectado. Niega tener un problema.',
+    'Viudo desde hace 2 años que empezó a beber para dormir. Ahora bebe una botella de vino diaria y no puede pasar un día sin alcohol. Ha perdido la custodia parcial de sus hijos.',
+    'Ejecutiva que bebe "para socializar" pero no puede parar una vez empieza. Ha tenido lagunas de memoria y comportamientos que no recuerda. Su familia ha hecho una intervención.',
+  ],
+  'trastorno_consumo_sustancias': [
+    'Empezó con cannabis recreativo, pasó a cocaína "para rendir en el trabajo" y ahora combina varias sustancias. Ha perdido su empleo, su pareja y está endeudado.',
+    'Adolescente que empezó con porros y ha probado MDMA, ketamina y alucinógenos. Sus padres le traen porque ha dejado los estudios y pasa las noches fuera.',
+  ],
+
+  // TRASTORNOS PSICÓTICOS
+  'esquizofrenia': [
+    'Primer episodio a los 22 años en la universidad. Empezó a creer que le espiaban a través del móvil y que sus compañeros conspiraban contra él. Ahora, con medicación, vive estable pero aislado.',
+    'Escucha voces que le critican y le ordenan hacer cosas. A veces les contesta en voz alta. Ha tenido varios ingresos porque deja la medicación "cuando se siente bien".',
+    'Desde hace años vive en un mundo paralelo con creencias muy elaboradas sobre misiones secretas. Su familia se ha adaptado a "seguirle la corriente" pero él/ella vive desconectado de la realidad.',
+  ],
+  'trastorno_esquizoafectivo': [
+    'Tiene episodios donde se mezclan síntomas psicóticos (voces, delirios) con depresiones profundas o fases de euforia. Es difícil distinguir qué síntomas predominan en cada momento.',
+  ],
+};
+
+// ============================================================================
+// SALUDOS CONTEXTUALES POR TRASTORNO
+// ============================================================================
+export const greetingsByDisorder: Record<string, string[]> = {
+  'trastorno_depresivo_mayor': [
+    "Hola... perdona, estoy un poco cansado/a. No he dormido bien.",
+    "Buenos días, doctor/a. Gracias por verme, aunque no sé si sirve de algo.",
+    "Hola. Mi familia me ha obligado a venir, yo creo que no tiene solución.",
+    "Gracias por la cita... aunque me ha costado mucho salir de casa hoy.",
+  ],
+  'distimia': [
+    "Hola, doctor/a. Vengo porque me lo han recomendado, aunque siempre he sido así.",
+    "Buenos días. No sé muy bien qué esperar, nunca me he sentido diferente.",
+    "Hola. Mi pareja dice que debería ser más feliz, pero no sé cómo.",
+  ],
+  'trastorno_ansiedad_generalizada': [
+    "Hola, perdone si llego justo, estaba comprobando que había cerrado bien el coche.",
+    "Buenos días, doctor/a. Llevaba toda la semana preocupado/a por esta cita.",
+    "Hola. Necesito ayuda, no puedo seguir así de estresado/a todo el tiempo.",
+  ],
+  'trastorno_panico': [
+    "Hola... ¿está bien la ventilación aquí? Perdone, es que los espacios cerrados...",
+    "Buenos días. Casi no vengo, me ha dado algo parecido a un ataque en el coche.",
+    "Gracias por recibirme. ¿Tiene agua? A veces me mareo cuando estoy nervioso/a.",
+  ],
+  'fobia_social': [
+    "Hola... [voz baja] perdone, me cuesta un poco hablar con gente nueva.",
+    "Buenos días. Me ha costado mucho decidirme a venir, la verdad.",
+    "[ruborizado/a] Hola, doctor/a. Espero no decir nada raro.",
+  ],
+  'agorafobia': [
+    "Hola, doctor/a. He venido acompañado/a porque solo no/no puedo.",
+    "Buenos días. Es la primera vez que salgo de casa en semanas.",
+    "Gracias por recibirme. ¿Puedo sentarme cerca de la puerta?",
+  ],
+  'tept': [
+    "Hola. [mirando alrededor] ¿Hay más gente en la consulta?",
+    "Buenos días, doctor/a. Perdone si estoy un poco tenso/a.",
+    "[sobresaltándose con un ruido] Hola... lo siento, estoy muy nervioso/a últimamente.",
+  ],
+  'trastorno_obsesivo_compulsivo': [
+    "Hola, doctor/a. Perdone, ¿puedo usar gel antes de darle la mano?",
+    "Buenos días. Disculpe si tardo, tenía que hacer algo antes de entrar.",
+    "Hola. [tocando la puerta varias veces] Ya estoy, perdone.",
+  ],
+  'anorexia_nerviosa': [
+    "Hola. Me han obligado a venir, yo estoy bien.",
+    "Buenos días, doctor/a. No sé qué quieren que le diga, como normal.",
+    "Hola... [visiblemente delgado/a] Vengo porque mi madre insiste.",
+  ],
+  'bulimia_nerviosa': [
+    "Hola, doctor/a. Nadie sabe que estoy aquí, necesito discreción.",
+    "Buenos días. Tengo un problema que me da mucha vergüenza contar.",
+    "Hola. He tardado años en decidirme a buscar ayuda.",
+  ],
+  'trastorno_limite_personalidad': [
+    "Hola, doctor/a. Espero que usted sí me entienda, los anteriores no sirvieron de nada.",
+    "Buenos días. [emocionalmente intensa] Necesito que me ayude, estoy desesperada.",
+    "Hola. No sé por dónde empezar, mi vida es un caos.",
+  ],
+  'trastorno_narcisista_personalidad': [
+    "Hola. Vengo porque mi esposa dice que tengo que cambiar, aunque yo creo que el problema es ella.",
+    "Buenos días. He tenido psicólogos antes pero ninguno estaba a mi nivel.",
+    "Hola, doctor/a. Espero que esto sea diferente, no me gusta perder el tiempo.",
+  ],
+  'trastorno_bipolar_i': [
+    "[si depresión] Hola... perdone, me cuesta hasta hablar hoy.",
+    "[si eutimia] Buenos días, doctor/a. Estoy aquí para el seguimiento.",
+    "[si hipomanía] ¡Hola! Tengo muchas cosas que contarle, he tenido ideas geniales.",
+  ],
+  'trastorno_consumo_alcohol': [
+    "Hola, doctor/a. Vengo porque mi familia me ha dado un ultimátum.",
+    "Buenos días. Yo controlo, pero dicen que tengo un problema.",
+    "Hola. [temblor leve] No he bebido hoy, se lo juro.",
+  ],
+  'esquizofrenia': [
+    "Hola, doctor/a. [mirando alrededor] ¿Podemos hablar en privado?",
+    "Buenos días. Las voces me dijeron que viniera.",
+    "Hola. Mi familia me ha traído, yo estoy bien.",
+  ],
+};
+
+// ============================================================================
+// FUNCIÓN MEJORADA PARA GENERAR PACIENTES
+// ============================================================================
+export const generatePatientForDifficulty = (
+  difficulty: 'entrenamiento' | 'normal' | 'dificil' | 'realista',
+  seed?: number
+): Patient => {
+  const availableDisorders = getDisordersByDifficulty(difficulty);
+  const randomSeed = seed ?? Date.now();
+  const randomDisorder = availableDisorders[Math.floor(Math.abs(Math.sin(randomSeed) * availableDisorders.length))];
+  const patientInfo = generateRandomPatient(randomSeed);
+
+  // Obtener backstory específico del trastorno
+  const backstories = detailedBackstories[randomDisorder.id] || [
+    `Paciente que presenta síntomas compatibles con ${randomDisorder.name}. Acude derivado por su médico de atención primaria.`
+  ];
+  const selectedBackstory = backstories[Math.floor(Math.abs(Math.sin(randomSeed + 5)) * backstories.length)];
+
+  return {
+    id: `patient_${randomSeed}`,
+    name: patientInfo.name,
+    age: patientInfo.age,
+    occupation: patientInfo.occupation,
+    avatar: patientInfo.avatar,
+    symptoms: randomDisorder.symptoms.slice(0, Math.min(5, randomDisorder.symptoms.length)),
+    disorder: randomDisorder.id,
+    personality: ['colaborativo', 'reservado', 'ansioso', 'defensivo', 'emocional'][Math.floor(Math.abs(Math.sin(randomSeed + 10)) * 5)],
+    backstory: selectedBackstory,
+    rapport: Math.floor(40 + Math.abs(Math.sin(randomSeed + 20)) * 40),
+  };
+};
+
+// Pacientes predefinidos para compatibilidad (ahora generados dinámicamente)
 export const mockPatients: Patient[] = [
-  {
-    id: 'patient_1',
-    name: 'María García',
-    age: 28,
-    occupation: 'Profesora',
-    avatar: 'MG',
-    symptoms: ['ansiedad', 'insomnio', 'irritabilidad', 'preocupación_excesiva'],
-    disorder: 'trastorno_ansiedad_generalizada',
-    personality: 'colaborativo',
-    backstory: 'Problemas en el trabajo con su jefe Luis, recuerdos de infancia con padre estricto Roberto',
-    rapport: 70,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_2',
-    name: 'Carlos Rodríguez',
-    age: 35,
-    occupation: 'Ingeniero',
-    avatar: 'CR',
-    symptoms: ['tristeza', 'fatiga', 'pérdida_interés', 'insomnio', 'culpa'],
-    disorder: 'depresion_mayor',
-    personality: 'reservado',
-    backstory: 'Divorcio reciente, problemas económicos, hija Lucía de 7 años',
-    rapport: 65,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_3',
-    name: 'Ana Martínez',
-    age: 22,
-    occupation: 'Estudiante',
-    avatar: 'AM',
-    symptoms: ['ataques_pánico', 'evitación', 'sudoración', 'palpitaciones'],
-    disorder: 'trastorno_pánico',
-    personality: 'ansioso',
-    backstory: 'Trauma en adolescencia, miedo a espacios cerrados, problemas académicos',
-    rapport: 60,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_4',
-    name: 'Diego Fernández',
-    age: 41,
-    occupation: 'Médico',
-    avatar: 'DF',
-    symptoms: ['flashbacks', 'pesadillas', 'hipervigilancia', 'insomnio'],
-    disorder: 'tept',
-    personality: 'perfeccionista',
-    backstory: 'Experiencia traumática en el hospital durante la pandemia',
-    rapport: 55,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_5',
-    name: 'Sofia López',
-    age: 19,
-    occupation: 'Estudiante',
-    avatar: 'SL',
-    symptoms: ['miedo_social', 'evitación', 'ruborización', 'temblores'],
-    disorder: 'fobia_social',
-    personality: 'tímido',
-    backstory: 'Bullying en la escuela, dificultades para hacer amigos',
-    rapport: 45,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_6',
-    name: 'Roberto Sánchez',
-    age: 33,
-    occupation: 'Abogado',
-    avatar: 'RS',
-    symptoms: ['perfeccionismo', 'dudas', 'lavado_manos', 'comprobación'],
-    disorder: 'toc',
-    personality: 'obsesivo',
-    backstory: 'Ambiente familiar exigente, necesidad de control absoluto',
-    rapport: 40,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_7',
-    name: 'Elena Vásquez',
-    age: 26,
-    occupation: 'Diseñadora',
-    avatar: 'EV',
-    symptoms: ['alta_autoestima', 'fantasías_poder', 'explotación', 'falta_empatía'],
-    disorder: 'trastorno_narcisista',
-    personality: 'narcisista',
-    backstory: 'Sobreccompensación por inseguridades infantiles',
-    rapport: 30,
-    sessions: 0,
-    sessionId: null,
-  },
-  {
-    id: 'patient_8',
-    name: 'Miguel Herrera',
-    age: 29,
-    occupation: 'Artista',
-    avatar: 'MH',
-    symptoms: ['cambios_estado_animo', 'impulsividad', 'inseguridad', 'ira'],
-    disorder: 'trastorno_limite',
-    personality: 'emocional',
-    backstory: 'Abandono en la infancia, relaciones tóxicas en adolescencia',
-    rapport: 35,
-    sessions: 0,
-    sessionId: null,
-  },
+  generatePatientForDifficulty('entrenamiento', 1001),
+  generatePatientForDifficulty('entrenamiento', 1002),
+  generatePatientForDifficulty('normal', 1003),
+  generatePatientForDifficulty('normal', 1004),
+  generatePatientForDifficulty('dificil', 1005),
+  generatePatientForDifficulty('dificil', 1006),
+  generatePatientForDifficulty('realista', 1007),
+  generatePatientForDifficulty('realista', 1008),
 ];
 
 // Videos de PsykTok

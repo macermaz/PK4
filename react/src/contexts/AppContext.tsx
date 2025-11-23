@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, Case, Patient, Message } from '../types';
+import { User, Case, Patient, Message, CaseDifficulty, CaseNote, LifeAspects, CaseFinalScore } from '../types';
 import { mockPatients } from '../data/mockData';
+import { IS_DEVELOPMENT, getInitialUser, log } from '../config/environment';
+
+// Re-exportar para compatibilidad con código existente
+export const DEV_MODE = IS_DEVELOPMENT;
+
+// Obtener configuración inicial del usuario desde environment.ts
+const initialUserConfig = getInitialUser();
 
 // Estado inicial
 interface AppState {
@@ -13,13 +20,24 @@ interface AppState {
 
 const initialState: AppState = {
   user: {
-    level: 1,
-    xp: 0,
+    level: initialUserConfig.level,
+    xp: initialUserConfig.xp,
     maxXp: 100,
+    coins: initialUserConfig.coins,
+    streak: 0,
+    lastPlayedDate: null,
     isPremium: false,
     casesCompleted: 0,
     totalQuestions: 0,
     correctDiagnoses: 0,
+    unlockedSkins: ['default'],
+    settings: {
+      theme: 'light',
+      fontSize: 'medium',
+      soundEnabled: true,
+      vibrationEnabled: true,
+      notificationsEnabled: true,
+    },
   },
   cases: [],
   currentCase: null,
@@ -27,15 +45,21 @@ const initialState: AppState = {
 };
 
 // Acciones
-type AppAction = 
+type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_USER'; payload: Partial<User> }
   | { type: 'SET_CASES'; payload: Case[] }
   | { type: 'ADD_CASE'; payload: Case }
   | { type: 'UPDATE_CASE'; payload: { id: string; updates: Partial<Case> } }
+  | { type: 'REMOVE_CASE'; payload: string }
   | { type: 'SET_CURRENT_CASE'; payload: Case | null }
   | { type: 'ADD_XP'; payload: number }
-  | { type: 'COMPLETE_CASE'; payload: { caseId: string; correct: boolean } };
+  | { type: 'ADD_COINS'; payload: number }
+  | { type: 'SPEND_COINS'; payload: number }
+  | { type: 'UPDATE_STREAK' }
+  | { type: 'COMPLETE_CASE'; payload: { caseId: string; correct: boolean; xpGained: number; coinsGained: number } }
+  | { type: 'CANCEL_CASE'; payload: string }
+  | { type: 'ADD_MESSAGE'; payload: { caseId: string; message: Message } };
 
 // Reducer
 const appReducer = (state: AppState, action: AppAction): AppState => {
@@ -89,23 +113,103 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         },
       };
     
+    case 'REMOVE_CASE':
+      return {
+        ...state,
+        cases: state.cases.filter(case_ => case_.id !== action.payload),
+      };
+
+    case 'ADD_COINS':
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          coins: state.user.coins + action.payload,
+        },
+      };
+
+    case 'SPEND_COINS':
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          coins: Math.max(0, state.user.coins - action.payload),
+        },
+      };
+
+    case 'UPDATE_STREAK':
+      const today = new Date().toDateString();
+      const lastPlayed = state.user.lastPlayedDate;
+      let newStreak = state.user.streak;
+
+      if (lastPlayed) {
+        const lastDate = new Date(lastPlayed);
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (lastDate.toDateString() === yesterday.toDateString()) {
+          newStreak += 1;
+        } else if (lastDate.toDateString() !== today) {
+          newStreak = 1;
+        }
+      } else {
+        newStreak = 1;
+      }
+
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          streak: newStreak,
+          lastPlayedDate: today,
+        },
+      };
+
     case 'COMPLETE_CASE':
       return {
         ...state,
         user: {
           ...state.user,
           casesCompleted: state.user.casesCompleted + 1,
-          correctDiagnoses: action.payload.correct 
+          correctDiagnoses: action.payload.correct
             ? state.user.correctDiagnoses + 1
             : state.user.correctDiagnoses,
+          xp: state.user.xp + action.payload.xpGained,
+          coins: state.user.coins + action.payload.coinsGained,
         },
-        cases: state.cases.map(case_ => 
-          case_.id === action.payload.caseId 
+        cases: state.cases.map(case_ =>
+          case_.id === action.payload.caseId
             ? { ...case_, status: 'completed' as const }
             : case_
         ),
       };
-    
+
+    case 'CANCEL_CASE':
+      return {
+        ...state,
+        cases: state.cases.map(case_ =>
+          case_.id === action.payload
+            ? { ...case_, status: 'cancelled' as const }
+            : case_
+        ),
+        currentCase: state.currentCase?.id === action.payload ? null : state.currentCase,
+      };
+
+    case 'ADD_MESSAGE':
+      return {
+        ...state,
+        cases: state.cases.map(case_ =>
+          case_.id === action.payload.caseId
+            ? {
+                ...case_,
+                messages: [...case_.messages, action.payload.message],
+                lastMessage: action.payload.message.text,
+                lastMessageTime: new Date().toLocaleTimeString(),
+              }
+            : case_
+        ),
+      };
+
     default:
       return state;
   }
@@ -118,6 +222,7 @@ const AppContext = createContext<{
   addMessage: (caseId: string, message: Message) => void;
   createNewCase: (patient: Patient) => Case;
   generateId: () => string;
+  calculateFinalScore: (caseData: Case) => CaseFinalScore;
 } | null>(null);
 
 // Hook personalizado
@@ -143,44 +248,108 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   // Función para crear nuevo caso
-  const createNewCase = (patient: Patient): Case => {
+  const createNewCase = (patient: Patient, difficulty: CaseDifficulty = 'normal', isFromFamily: boolean = false): Case => {
     const newCase: Case = {
       id: generateId(),
       patient,
       messages: [],
       status: 'new',
+      difficulty,
       lastMessage: '',
       lastMessageTime: '',
       unreadCount: 0,
       sessions: 0,
+      questionsThisSession: 0,
       backstoryRevealed: false,
       selectedSymptoms: [],
+      notes: [],
       diagnosis: null,
       diagnosisCorrect: null,
-      batteryApplied: null,
-      batteryResults: null,
+      treatment: null,
+      treatmentAttempts: 0,
+      treatmentCorrect: null,
+      treatmentSentDate: null,
+      testsApplied: [],
+      testsResults: [],
       sessionId: null,
+      isFromFamily,
+      rapport: difficulty === 'realista' ? 50 : 70,
+      createdAt: new Date().toISOString(),
+      // Métricas de aspectos de vida explorados
+      lifeAspectsExplored: {
+        laboral: false,
+        familiar: false,
+        social: false,
+        ocio: false,
+        salud: false,
+        metas: false,
+        autopercepcion: false,
+        trauma: false,
+        sueno: false,
+        alimentacion: false,
+      },
+      finalScore: null,
     };
     return newCase;
   };
 
-  // Función para añadir mensaje
+  // Función para añadir mensaje - usa dispatch directo para evitar problemas de closure
   const addMessage = (caseId: string, message: Message) => {
-    const case_ = state.cases.find(c => c.id === caseId);
-    if (case_) {
-      const updatedMessages = [...case_.messages, message];
-      dispatch({
-        type: 'UPDATE_CASE',
-        payload: {
-          id: caseId,
-          updates: {
-            messages: updatedMessages,
-            lastMessage: message.text,
-            lastMessageTime: new Date().toLocaleTimeString(),
-          },
-        },
-      });
-    }
+    dispatch({
+      type: 'ADD_MESSAGE',
+      payload: { caseId, message },
+    });
+  };
+
+  // Función para calcular puntuación final del caso
+  const calculateFinalScore = (caseData: Case): CaseFinalScore => {
+    // 1. Diagnóstico a la primera (fue correcto desde el principio)
+    const diagnosisFirstTry = caseData.diagnosisCorrect === true;
+
+    // 2. Tratamiento a la primera (solo un intento)
+    const treatmentFirstTry = (caseData.treatmentAttempts || 1) === 1 && caseData.treatmentCorrect === true;
+
+    // 3. Calidad de preguntas (promedio de scores de mensajes del paciente)
+    const patientMessages = caseData.messages.filter(m => m.sender === 'patient' && m.score !== undefined);
+    const questionQuality = patientMessages.length > 0
+      ? Math.round(patientMessages.reduce((sum, m) => sum + (m.score || 50), 0) / patientMessages.length)
+      : 50;
+
+    // 4. Aspectos de vida explorados (% de 10 aspectos)
+    const lifeAspects = caseData.lifeAspectsExplored || {};
+    const aspectsExplored = Object.values(lifeAspects).filter(Boolean).length;
+    const lifeAspectsScore = Math.round((aspectsExplored / 10) * 100);
+
+    // 5. Rapport final
+    const rapportFinal = caseData.rapport || 50;
+
+    // 6. Calcular puntuación total ponderada
+    // Pesos: Diagnóstico 20%, Tratamiento 30%, Preguntas 25%, Aspectos 15%, Rapport 10%
+    let totalScore = 0;
+    totalScore += diagnosisFirstTry ? 20 : (caseData.diagnosisCorrect ? 10 : 0);
+    totalScore += treatmentFirstTry ? 30 : (caseData.treatmentCorrect ? 15 : 0);
+    totalScore += (questionQuality / 100) * 25;
+    totalScore += (lifeAspectsScore / 100) * 15;
+    totalScore += (rapportFinal / 100) * 10;
+
+    totalScore = Math.round(totalScore);
+
+    // 7. Calcular estrellas (1-5)
+    let stars = 1;
+    if (totalScore >= 90) stars = 5;
+    else if (totalScore >= 75) stars = 4;
+    else if (totalScore >= 55) stars = 3;
+    else if (totalScore >= 35) stars = 2;
+
+    return {
+      diagnosisFirstTry,
+      treatmentFirstTry,
+      questionQuality,
+      lifeAspectsScore,
+      rapportFinal,
+      totalScore,
+      stars,
+    };
   };
 
   // Cargar datos al iniciar
@@ -235,6 +404,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       addMessage,
       createNewCase,
       generateId,
+      calculateFinalScore,
     }}>
       {children}
     </AppContext.Provider>

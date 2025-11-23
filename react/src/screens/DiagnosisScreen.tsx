@@ -16,40 +16,86 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
-import { useAI } from '../contexts/AIContext';
 import { RootStackParamList } from '../types/navigation';
-import { dsmData, testBatteries } from '../data/mockData';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { symptomCategories, disorders, getDisordersByDifficulty, Disorder } from '../data/clinicalData';
+
+// Mapeo de categoría del trastorno a la clave de categoryConfig
+const categoryToConfigKey = (category: string): string => {
+  const mapping: Record<string, string> = {
+    'animo': 'depresivos',
+    'ansiedad': 'ansiedad',
+    'trauma': 'trauma',
+    'alimentacion': 'alimentarios',
+    'sustancias': 'sustancias',
+    'personalidad': 'personalidad',
+  };
+  return mapping[category] || 'otros';
+};
+import { CaseDifficulty } from '../types';
 
 type DiagnosisNavigationProp = StackNavigationProp<RootStackParamList, 'Diagnosis'>;
 type DiagnosisRouteProp = RouteProp<RootStackParamList, 'Diagnosis'>;
+
+// Configuración de categorías de diagnósticos
+const categoryConfig: Record<string, { label: string; icon: string; color: string }> = {
+  depresivos: { label: 'Trastornos Depresivos', icon: 'cloud', color: '#5C6BC0' },
+  ansiedad: { label: 'Trastornos de Ansiedad', icon: 'bolt', color: '#FF7043' },
+  trauma: { label: 'Trauma y Estrés', icon: 'heartbeat', color: '#EF5350' },
+  obsesivos: { label: 'TOC y Relacionados', icon: 'refresh', color: '#AB47BC' },
+  alimentarios: { label: 'Trastornos Alimentarios', icon: 'cutlery', color: '#26A69A' },
+  personalidad: { label: 'Trastornos de Personalidad', icon: 'user', color: '#EC407A' },
+  bipolares: { label: 'Trastornos Bipolares', icon: 'exchange', color: '#FFA726' },
+  sustancias: { label: 'Trastornos por Sustancias', icon: 'flask', color: '#78909C' },
+  psicoticos: { label: 'Trastornos Psicóticos', icon: 'eye', color: '#7E57C2' },
+  otros: { label: 'Otros Trastornos', icon: 'question-circle', color: '#90A4AE' },
+};
 
 const DiagnosisScreen: React.FC = () => {
   const route = useRoute<DiagnosisRouteProp>();
   const navigation = useNavigation<DiagnosisNavigationProp>();
   const { state, dispatch } = useApp();
-  const { applyTestBattery } = useAI();
   const { caseId } = route.params;
-  
+
   const [currentCase, setCurrentCase] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'symptoms' | 'hypothesis' | 'batteries' | 'diagnose'>('symptoms');
+  const [activeTab, setActiveTab] = useState<'symptoms' | 'hypothesis' | 'diagnose'>('symptoms');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [hypothesis, setHypothesis] = useState<any[]>([]);
   const [selectedDiagnosis, setSelectedDiagnosis] = useState<string>('');
+  const [availableDisorders, setAvailableDisorders] = useState<Disorder[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
-  // Cargar caso actual
+  // Cargar caso actual y diagnósticos disponibles según dificultad
   useEffect(() => {
     const case_ = state.cases.find(c => c.id === caseId);
     if (case_) {
       setCurrentCase(case_);
       setSelectedSymptoms(case_.selectedSymptoms || []);
+
+      // Cargar diagnósticos filtrados por dificultad
+      let disordersForDifficulty = getDisordersByDifficulty(case_.difficulty);
+
+      // IMPORTANTE: Siempre incluir el trastorno real del paciente
+      // para garantizar que el diagnóstico correcto sea posible
+      const patientDisorderId = case_.patient?.disorder;
+      if (patientDisorderId && disorders[patientDisorderId]) {
+        const patientDisorder = disorders[patientDisorderId];
+        const alreadyIncluded = disordersForDifficulty.some(d => d.id === patientDisorderId);
+        if (!alreadyIncluded) {
+          disordersForDifficulty = [...disordersForDifficulty, patientDisorder];
+        }
+      }
+
+      setAvailableDisorders(disordersForDifficulty);
     }
   }, [caseId, state.cases]);
 
-  // Actualizar hipótesis cuando cambian los síntomas
+  // Actualizar hipótesis cuando cambian los síntomas o los diagnósticos disponibles
   useEffect(() => {
-    updateHypothesis();
-  }, [selectedSymptoms]);
+    if (availableDisorders.length > 0) {
+      updateHypothesis();
+    }
+  }, [selectedSymptoms, availableDisorders]);
 
   // Alternar síntoma
   const toggleSymptom = (symptom: string) => {
@@ -79,15 +125,15 @@ const DiagnosisScreen: React.FC = () => {
     }
 
     const matches: any[] = [];
-    Object.entries(dsmData.disorders).forEach(([key, disorder]) => {
-      const matchingSymptoms = disorder.symptoms.filter(s => 
+    availableDisorders.forEach((disorder) => {
+      const matchingSymptoms = disorder.symptoms.filter((s: string) =>
         selectedSymptoms.includes(s)
       );
-      
+
       if (matchingSymptoms.length > 0) {
         const percentage = (matchingSymptoms.length / disorder.criteria) * 100;
         matches.push({
-          id: key,
+          id: disorder.id,
           name: disorder.name,
           match: matchingSymptoms.length,
           total: disorder.criteria,
@@ -95,6 +141,7 @@ const DiagnosisScreen: React.FC = () => {
           symptoms: matchingSymptoms,
           description: disorder.description,
           duration: disorder.duration,
+          category: disorder.category,
         });
       }
     });
@@ -103,70 +150,28 @@ const DiagnosisScreen: React.FC = () => {
     setHypothesis(matches);
   };
 
-  // Aplicar batería de tests
-  const handleApplyBattery = async (batteryId: string) => {
-    if (!currentCase) return;
-
-    try {
-      const result = await applyTestBattery(batteryId);
-      
-      if (result) {
-        // Actualizar caso con batería aplicada
-        dispatch({
-          type: 'UPDATE_CASE',
-          payload: {
-            id: currentCase.id,
-            updates: {
-              batteryApplied: batteryId,
-              batteryResults: result.results,
-            },
-          },
-        });
-
-        // Navegar a chat para nueva sesión
-        setTimeout(() => {
-          navigation.navigate('Chat', { caseId: currentCase.id });
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Error aplicando batería:', error);
-    }
-  };
-
   // Confirmar diagnóstico
   const confirmDiagnosis = () => {
     if (!selectedDiagnosis || !currentCase) return;
 
     const correct = selectedDiagnosis === currentCase.patient.disorder;
-    
-    // Calcular XP
-    let xpGained = 50; // Base
-    if (correct) xpGained += 100;
-    if (currentCase.sessions >= 2) xpGained += 50;
-    if (currentCase.batteryApplied) xpGained += 30;
-    if (selectedSymptoms.length >= 3) xpGained += 20;
 
-    // Actualizar caso
+    // Actualizar caso - guardar diagnóstico, status 'awaiting_treatment'
+    // El resultado del diagnóstico se guarda pero NO se muestra hasta el tratamiento
     dispatch({
       type: 'UPDATE_CASE',
       payload: {
         id: currentCase.id,
         updates: {
-          status: 'completed' as const,
+          status: 'awaiting_treatment' as const,
           diagnosis: selectedDiagnosis,
-          diagnosisCorrect: correct,
+          diagnosisCorrect: correct, // Se guarda pero el usuario no ve el resultado aún
         },
       },
     });
 
-    // Añadir XP
-    dispatch({ type: 'ADD_XP', payload: xpGained });
-
-    // Navegar a resultados
-    navigation.navigate('Results', {
-      correct,
-      xpGained,
-      diagnosis: selectedDiagnosis,
+    // Navegar a tratamiento - el objetivo del juego es el tratamiento correcto
+    navigation.navigate('Treatment', {
       caseId: currentCase.id,
     });
   };
@@ -174,13 +179,13 @@ const DiagnosisScreen: React.FC = () => {
   // Renderizar síntomas
   const renderSymptoms = () => (
     <ScrollView style={styles.tabContent}>
-      {Object.entries(dsmData.categories).map(([category, symptoms]) => (
+      {Object.entries(symptomCategories).map(([category, symptoms]) => (
         <View key={category} style={styles.categorySection}>
           <Text style={styles.categoryTitle}>
             {category.charAt(0).toUpperCase() + category.slice(1)}
           </Text>
           <View style={styles.symptomsGrid}>
-            {symptoms.map((symptom) => {
+            {symptoms.map((symptom: string) => {
               const isSelected = selectedSymptoms.includes(symptom);
               return (
                 <TouchableOpacity
@@ -196,7 +201,7 @@ const DiagnosisScreen: React.FC = () => {
                       style={styles.symptomIcon}
                     />
                     <Text style={[styles.symptomText, isSelected && styles.symptomTextSelected]}>
-                      {symptom.replace('_', ' ')}
+                      {symptom.replace(/_/g, ' ')}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -260,92 +265,145 @@ const DiagnosisScreen: React.FC = () => {
     </ScrollView>
   );
 
-  // Renderizar baterías
-  const renderBatteries = () => (
+  // Alternar categoría expandida
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  // Agrupar diagnósticos por categoría (mapeando a las claves de categoryConfig)
+  const getDisordersByCategory = (): Record<string, Disorder[]> => {
+    const grouped: Record<string, Disorder[]> = {};
+    availableDisorders.forEach(disorder => {
+      // Mapear la categoría del trastorno a la clave de categoryConfig
+      const configKey = categoryToConfigKey(disorder.category);
+      if (!grouped[configKey]) grouped[configKey] = [];
+      grouped[configKey].push(disorder);
+    });
+    return grouped;
+  };
+
+  // Renderizar diagnóstico
+  const renderDiagnosis = () => {
+    const selectedDisorder = availableDisorders.find(d => d.id === selectedDiagnosis);
+    const matchingHypothesis = hypothesis.find(h => h.id === selectedDiagnosis);
+    const groupedDisorders = getDisordersByCategory();
+    const categories = Object.keys(groupedDisorders);
+
+    return (
     <ScrollView style={styles.tabContent}>
-      {testBatteries.map((battery) => {
-        const isApplied = currentCase?.batteryApplied === battery.id;
-        return (
-          <View key={battery.id} style={styles.batteryCard}>
-            <View style={styles.batteryHeader}>
-              <Text style={styles.batteryName}>{battery.name}</Text>
-              {isApplied && (
-                <View style={styles.appliedBadge}>
-                  <Text style={styles.appliedText}>✓ Aplicado</Text>
+      <View style={styles.diagnosisForm}>
+        <Text style={styles.diagnosisLabel}>
+          Selecciona un diagnóstico DSM-5-TR ({availableDisorders.length} disponibles):
+        </Text>
+
+        {/* Categorías con acordeón */}
+        {categories.map(category => {
+          const config = categoryConfig[category] || categoryConfig.otros;
+          const disordersInCategory = groupedDisorders[category];
+          const isExpanded = expandedCategories.includes(category);
+          const hasSelectedInCategory = disordersInCategory.some(d => d.id === selectedDiagnosis);
+
+          return (
+            <View key={category} style={styles.categoryAccordion}>
+              {/* Header de categoría */}
+              <TouchableOpacity
+                style={[
+                  styles.categoryHeader,
+                  { borderLeftColor: config.color },
+                  hasSelectedInCategory && styles.categoryHeaderSelected,
+                ]}
+                onPress={() => toggleCategory(category)}
+              >
+                <View style={[styles.categoryIconContainer, { backgroundColor: config.color + '20' }]}>
+                  <Icon name={config.icon} size={18} color={config.color} />
+                </View>
+                <View style={styles.categoryTitleContainer}>
+                  <Text style={styles.categoryHeaderTitle}>{config.label}</Text>
+                  <Text style={styles.categoryCount}>{disordersInCategory.length} diagnósticos</Text>
+                </View>
+                {hasSelectedInCategory && (
+                  <View style={[styles.selectedBadge, { backgroundColor: config.color }]}>
+                    <Icon name="check" size={10} color="white" />
+                  </View>
+                )}
+                <Icon
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color="#666"
+                  style={styles.chevron}
+                />
+              </TouchableOpacity>
+
+              {/* Contenido expandido */}
+              {isExpanded && (
+                <View style={styles.categoryContent}>
+                  {disordersInCategory.map(disorder => {
+                    const isSelected = selectedDiagnosis === disorder.id;
+                    const matchPercentage = hypothesis.find(h => h.id === disorder.id)?.percentage;
+
+                    return (
+                      <TouchableOpacity
+                        key={disorder.id}
+                        style={[
+                          styles.diagnosisOption,
+                          isSelected && [styles.diagnosisOptionSelected, { borderColor: config.color }],
+                        ]}
+                        onPress={() => setSelectedDiagnosis(disorder.id)}
+                      >
+                        <View style={styles.diagnosisOptionContent}>
+                          <View style={[
+                            styles.diagnosisRadio,
+                            isSelected && [styles.diagnosisRadioSelected, { borderColor: config.color }],
+                          ]}>
+                            {isSelected && (
+                              <View style={[styles.diagnosisRadioInner, { backgroundColor: config.color }]} />
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.diagnosisOptionText, isSelected && { color: config.color, fontWeight: '600' }]}>
+                              {disorder.name}
+                            </Text>
+                            <Text style={styles.diagnosisOptionMeta}>
+                              {disorder.criteria} criterios • {disorder.duration}
+                            </Text>
+                          </View>
+                          {matchPercentage !== undefined && matchPercentage > 0 && (
+                            <View style={[styles.matchBadge, { backgroundColor: matchPercentage >= 60 ? '#4CAF50' : '#FF9800' }]}>
+                              <Text style={styles.matchBadgeText}>{Math.round(matchPercentage)}%</Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </View>
-            <Text style={styles.batteryDescription}>{battery.description}</Text>
-            <View style={styles.batteryMeta}>
-              <Text style={styles.batteryType}>Tipo: {battery.type}</Text>
-              <Text style={styles.batteryDuration}>Duración: {battery.duration}</Text>
-            </View>
-            
-            {currentCase?.batteryResults && isApplied && (
-              <View style={styles.batteryResults}>
-                <Text style={styles.resultsLabel}>Resultados:</Text>
-                <Text style={styles.resultsText}>{currentCase.batteryResults}</Text>
-              </View>
-            )}
-            
-            <TouchableOpacity
-              style={[styles.batteryButton, isApplied && styles.batteryButtonDisabled]}
-              onPress={() => handleApplyBattery(battery.id)}
-              disabled={isApplied}
-            >
-              <Text style={[styles.batteryButtonText, isApplied && styles.batteryButtonTextDisabled]}>
-                {isApplied ? 'Aplicado' : 'Aplicar batería'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-    </ScrollView>
-  );
-
-  // Renderizar diagnóstico
-  const renderDiagnosis = () => (
-    <ScrollView style={styles.tabContent}>
-      <View style={styles.diagnosisForm}>
-        <Text style={styles.diagnosisLabel}>Selecciona un diagnóstico DSM-5-TR:</Text>
-        
-        <View style={styles.diagnosisSelect}>
-          {Object.entries(dsmData.disorders).map(([key, disorder]) => (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.diagnosisOption,
-                selectedDiagnosis === key && styles.diagnosisOptionSelected,
-              ]}
-              onPress={() => setSelectedDiagnosis(key)}
-            >
-              <View style={styles.diagnosisOptionContent}>
-                <View style={[
-                  styles.diagnosisRadio,
-                  selectedDiagnosis === key && styles.diagnosisRadioSelected,
-                ]}>
-                  {selectedDiagnosis === key && (
-                    <View style={styles.diagnosisRadioInner} />
-                  )}
-                </View>
-                <Text style={styles.diagnosisOptionText}>{disorder.name}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+          );
+        })}
 
         {/* Resumen del diagnóstico */}
-        {selectedDiagnosis && (
-          <View style={styles.diagnosisSummary}>
-            <Text style={styles.summaryTitle}>Resumen del diagnóstico:</Text>
-            <Text style={styles.summaryText}>
-              {dsmData.disorders[selectedDiagnosis]?.description}
+        {selectedDiagnosis && selectedDisorder && (
+          <View style={[styles.diagnosisSummary, { borderLeftColor: categoryConfig[categoryToConfigKey(selectedDisorder.category)]?.color || '#4A90E2' }]}>
+            <Text style={[styles.summaryTitle, { color: categoryConfig[categoryToConfigKey(selectedDisorder.category)]?.color || '#4A90E2' }]}>
+              {selectedDisorder.name}
             </Text>
-            
-            {hypothesis.length > 0 && (
+            <Text style={styles.summaryText}>
+              {selectedDisorder.description}
+            </Text>
+            <Text style={styles.summaryMeta}>
+              Criterios requeridos: {selectedDisorder.criteria} • Duración: {selectedDisorder.duration}
+            </Text>
+
+            {matchingHypothesis && (
               <View style={styles.hypothesisInfo}>
+                <Icon name="lightbulb-o" size={14} color="#4CAF50" />
                 <Text style={styles.hypothesisText}>
-                  Coincidencia con hipótesis: {Math.round(hypothesis[0]?.percentage || 0)}%
+                  Coincidencia con hipótesis: {Math.round(matchingHypothesis.percentage)}%
                 </Text>
               </View>
             )}
@@ -357,17 +415,18 @@ const DiagnosisScreen: React.FC = () => {
           onPress={confirmDiagnosis}
           disabled={!selectedDiagnosis}
         >
+          <Icon name="check-circle" size={20} color="white" style={{ marginRight: 10 }} />
           <Text style={styles.confirmButtonText}>Confirmar Diagnóstico</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
-  );
+    );
+  };
 
-  // Tabs
+  // Tabs (sin baterías - eso está en herramientas del chat)
   const tabs = [
     { id: 'symptoms', title: 'Síntomas', icon: 'stethoscope' },
     { id: 'hypothesis', title: 'Hipótesis', icon: 'search' },
-    { id: 'batteries', title: 'Baterías', icon: 'clipboard' },
     { id: 'diagnose', title: 'Diagnosticar', icon: 'check-circle' },
   ];
 
@@ -436,7 +495,6 @@ const DiagnosisScreen: React.FC = () => {
       <View style={styles.content}>
         {activeTab === 'symptoms' && renderSymptoms()}
         {activeTab === 'hypothesis' && renderHypothesis()}
-        {activeTab === 'batteries' && renderBatteries()}
         {activeTab === 'diagnose' && renderDiagnosis()}
       </View>
     </LinearGradient>
@@ -786,7 +844,6 @@ const styles = StyleSheet.create({
   resultsText: {
     fontSize: 14,
     color: '#2e7d32',
-    fontFamily: 'System',
     fontFamily: 'Courier New',
   },
   batteryButton: {
@@ -912,6 +969,86 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Estilos para acordeón de categorías
+  categoryAccordion: {
+    marginBottom: 10,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  categoryHeaderSelected: {
+    backgroundColor: '#f8f9ff',
+  },
+  categoryIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  categoryTitleContainer: {
+    flex: 1,
+  },
+  categoryHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  selectedBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  chevron: {
+    marginLeft: 5,
+  },
+  categoryContent: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    marginTop: 5,
+    padding: 10,
+    gap: 8,
+  },
+  diagnosisOptionMeta: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+  },
+  matchBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  matchBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  summaryMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
   },
 });
 

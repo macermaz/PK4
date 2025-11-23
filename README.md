@@ -1,192 +1,420 @@
-# PSYKAT - Mobile Therapist Simulator
+# PSYKAT 4.0 - Mobile Therapist Simulator
 
-## Descripción
+## 1. Concepto
 
-PSYKAT es una aplicación móvil gamificada que simula el sistema operativo de un terapeuta, permitiendo a estudiantes y profesionales de psicología practicar entrevistas clínicas y diagnósticos en un entorno interactivo y seguro.
+| Aspecto | Descripción |
+|---------|-------------|
+| Nombre | PSYKAT - Mobile Therapist Simulator |
+| Concepto | Simulador del móvil de un terapeuta (PsykatOS) |
+| Mascota | PSYKAT - Gato psicólogo que nos deriva casos |
+| Público | Estudiantes de psicología, residentes, profesionales |
+| Modelo | Freemium (gratis con límites + premium) |
 
-## Características Principales
+## 2. Personajes
 
-### 🏠 Sistema PsykatOS
-- **Pantalla de bloqueo** personalizable con doble tap para desbloquear
-- **Escritorio móvil** con iconos de aplicaciones funcionales
-- **Temas desbloqueables** según nivel de usuario
-- **Notificaciones push** simuladas para nuevos casos
+| Personaje | Apariencia | Rol |
+|-----------|------------|-----|
+| PSYKAT | Gato normal | Profesional que deriva casos ("secretario") |
+| Dr. Domingo | PSYKAT + bigote + bata | Supervisor, da feedback |
+| PSYKAT paciente | PSYKAT disfrazado | Modo Sandbox/práctica |
 
-### 💬 Mensajería (Funcionalidad Principal)
-- **Chat tipo WhatsApp** con interfaz familiar
-- **5 preguntas por sesión** con contador visual
-- **Sistema de rapport** que afecta la profundidad de las respuestas
-- **Múltiples casos simultáneos** (máximo 5 activos)
-- **Menú inter-sesiones** con opciones:
-  - Nueva sesión
-  - Herramienta diagnóstico
-  - Guardar y salir
-  - Anular caso
+## 3. Apps del Escritorio
 
-### 📧 Correo
-- **Email diario** del secretario con nuevos casos
-- **Sistema de notificaciones** con badges
-- **Procesamiento automático** de nuevos pacientes
+| Icono | App | Función | Estado |
+|-------|-----|---------|--------|
+| 💬 | Mensajería | Chats activos con pacientes | ✅ Implementado |
+| 📧 | Correo | Casos nuevos, catálogo PSYKEA, notificaciones | ✅ Implementado |
+| 👥 | Contactos | Pacientes añadidos (info, notas, tests) | ✅ Implementado |
+| 📹 | TubeTok | Videos educativos (aquí van ads) | ✅ Básico |
+| 📔 | Diario | DSM-5, tests, tratamientos, biblioteca casos | ✅ Implementado |
+| 🎥 | Consulta | Cámara de la consulta de PSYKAT | ❌ Pendiente |
+| 🏆 | Logros | Rankings, achievements, estadísticas | ❌ Pendiente |
+| ⚙️ | Ajustes | Configuración, accesibilidad, cuenta | ✅ Implementado |
 
-### 👥 Contactos
-- **Lista de pacientes** disponibles
-- **Indicadores visuales** para casos nuevos
-- **Información básica** de cada paciente
+## 4. Sistema de Correos
 
-### 🔍 Herramienta de Diagnóstico
-- **Filtro de síntomas** DSM-5-TR organizados por categorías
-- **Sistema de hipótesis** con porcentaje de coincidencia
-- **Baterías de tests** aplicables (BDI-II, BAI, PCL-5, AUDIT)
-- **Selector DSM-5-TR** para diagnóstico final
+### Correos de PSYKAT (modos básicos):
+- **Entrenamiento**: Casos de práctica con ayudas
+- **Normal**: Pacientes directos o derivados
+- **Difícil**: Casos más complejos, familiar contacta
+- **Realista**: Pacientes reservados, rapport activo
 
-### 📺 TubeTok
-- **Feed de videos educativos** sobre psicología
-- **Sistema de interacción** (like, share, save)
-- **Monetización** mediante anuncios (solo en free version)
+### Correos de Agencias (modo histórico):
+- C.A.T. (Comisión de Atención Temporal)
+- C.A.U.P. (Comisión de Ayuda Universal Paralela)
+- A.R.C.A. (Agencia de Rescate de Casos Atípicos)
+- Portal Psi, Archivo Omega, Nexus
+- 1/5 correos = nombre inventado por IA según temática
 
-### 📔 Diario Clínico
-- **Wiki DSM-5-TR** con información básica
-- **Información de baterías** de tests
-- **Buenas prácticas** clínicas
-- **Sección de guardados** para contenido favorito
+### Otros correos:
+- **PSYKEA**: Catálogo de muebles para la consulta
+- **Dr. Domingo**: Feedback post-caso
+- **Sistema**: Eventos, urgencias, notificaciones
 
-### 🏆 Sistema de Progreso
-- **Experiencia (XP)** por casos completados
-- **Niveles** con desbloqueo de contenido
-- **Retroalimentación** post-diagnóstico
-- **Estadísticas** de rendimiento
+## 5. Límites de Casos Simultáneos
 
-## Mecánicas de Juego
+| Modo | Máximo | Sin correos nuevos si lleno |
+|------|--------|----------------------------|
+| Entrenamiento | 1 | ✓ |
+| Normal | 2 | ✓ |
+| Difícil | 2 | ✓ |
+| Realista | 1 | ✓ |
+| **TOTAL** | 6 | - |
 
-### Sistema de Preguntas
-- **Límite de 5 preguntas por sesión**
-- **Respuestas contextuales** basadas en palabras clave
-- **Profundidad variable** según tipo de pregunta
-- **Inventario de detalles** coherente con la historia
+## 6. Flujo de un Caso
 
-### Diagnóstico
-- **No forzado** - el usuario decide cuándo diagnosticar
-- **Sistema de puntaje** basado en precisión y profundidad
-- **Retroalimentación inmediata** con consejos de mejora
+1. Correo de PSYKAT/Agencia → genera seed del paciente
+2. "Añadir a contactos" → paciente en lista
+3. Tap contacto → abre chat → mensajes auto de saludo
+4. 5 preguntas por sesión
+5. Fin sesión → acceso a herramientas
+6. Herramientas: Diagnóstico, Tests, Notas
+7. Enviar test → nueva sesión → resultados
+8. Diagnóstico final → enviar informe
+9. Se desbloquea Tratamiento
+10. Seleccionar tratamiento → enviar documento
+11. Chat bloqueado → esperar 2 días reales
+12. Notificación: paciente responde
+13. Si correcto → review → logro
+14. Si incorrecto → ajustar o perder
 
-### Progresión
-- **Casos ilimitados** para usuarios premium
-- **2 casos difíciles diarios** para usuarios free
-- **Desbloqueo progresivo** de modos y contenido
-
-## Tecnología
-
-### Frontend
-- **HTML5/CSS3/JavaScript** vanilla
-- **Anime.js** para animaciones
-- **Typed.js** para efectos de texto
-- **Font Awesome** para iconos
-- **Diseño responsive** para móviles
-
-### Almacenamiento
-- **LocalStorage** para estado de la aplicación
-- **Datos persistentes** de casos y progreso
-
-### Características Técnicas
-- **Sin dependencias externas** (funciona offline)
-- **Animaciones fluidas** con hardware acceleration
-- **Gestos táctiles** optimizados
-- **Rendimiento optimizado** para dispositivos móviles
-
-## Estructura del Proyecto
+## 7. Interfaz del Chat
 
 ```
-/mnt/okcomputer/output/
-├── index.html          # Página principal
-├── styles.css          # Estilos y temas
-├── main.js            # Lógica de la aplicación
-├── README.md          # Este archivo
-└── resources/         # Recursos multimedia (si se añaden)
+┌─────────────────────────────────┐
+│ ←  |      Ana Martínez     | 👤 │
+├─────────────────────────────────┤
+│                                 │
+│     [Burbujas de chat]          │
+│                                 │
+├─────────────────────────────────┤
+│  ⊕  (__________________)        │
+└─────────────────────────────────┘
 ```
 
-## Uso
+### Swipe izquierda (menú paciente):
+- Información del paciente
+- Resumen del caso
+- Notas (añadir/ver)
+- Marcar como síntoma
+- Historial rápido
+- Ayuda (solo Normal/Entrenamiento)
 
-### Instalación
-1. Clonar o descargar los archivos
-2. Abrir `index.html` en un navegador web
-3. Para mejor experiencia, usar en modo móvil (F12 → Responsive Mode)
+### Botón "+" (herramientas):
+- 🔍 Herramienta Diagnóstica
+- 📋 Herramienta de Tests
+- 📝 Notas
+- 💊 Tratamiento (tras diagnóstico)
 
-### Primeros Pasos
-1. **Desbloquear** el dispositivo con doble tap
-2. **Revisar el correo** para nuevos casos
-3. **Añadir contactos** desde la lista disponible
-4. **Iniciar conversación** en Mensajería
-5. **Aplicar baterías** de tests cuando sea apropiado
-6. **Formular diagnóstico** usando la herramienta
-7. **Recibir retroalimentación** y XP
+### Tap en foto del paciente:
+- Ver info de contacto completa
+- Anular caso
 
-### Controles
-- **Tap**: Seleccionar/interactuar
-- **Doble tap**: Desbloquear pantalla
-- **Swipe**: Navegar entre chats (en futuras versiones)
-- **Back button**: Navegar hacia atrás
+## 8. Mecánicas de Juego
 
-## Datos Clínicos
+### Rapport (solo Realista):
+- Barra oculta 0-100
+- Afecta: profundidad respuestas, seguir tratamiento
+- +puntos: preguntas abiertas, empáticas
+- -puntos: cerradas, leading, ignorar info
 
-### Trastornos Incluidos
-- **Depresión Mayor** (F32.x)
-- **Trastorno de Ansiedad Generalizada** (F41.1)
-- **Trastorno de Pánico** (F41.0)
-- **Y más** según avance el usuario
+### Perder partida:
+- Insultar / propuestas indecentes
+- Reforzar tratamiento incorrecto 3+ veces
+- Modo fácil: pierde 1 turno
+- Modo difícil: paciente bloquea
 
-### Baterías de Tests
-- **BDI-II**: Inventario de Depresión de Beck
-- **BAI**: Inventario de Ansiedad de Beck
-- **PCL-5**: Checklist TEPT
-- **AUDIT**: Cuestionario de Identificación de Trastornos por Consumo de Alcohol
+### Timer (sesiones 2+):
+- 90 segundos sin escribir
+- Paciente: "Me puse a hacer cosas, tardaré 20 segundos"
 
-## Monetización
+### Tratamientos:
+- Principales: TCC, EMDR, DBT, Exposición, etc.
+- Complementarios: Mindfulness, meditación, etc.
+- Complementarios SOLOS = fallo
 
-### Modelo Freemium
-- **Versión Free**: Casos normales ilimitados, 2 casos difíciles/día, anuncios en TubeTok
-- **Versión Premium**: Todos los modos ilimitados, sin anuncios, contenido exclusivo
+## 9. PSYKEA y Consulta
 
-### Puntos de Monetización
-- **Anuncios** en TubeTok (banners y rewarded)
-- **Suscripción premium** mensual/anual
-- **Pase de temporada** con contenido cosmético
-- **Skins y temas** desbloqueables
+### Cámara de la consulta:
+- Ver a PSYKAT en su despacho
+- Muebles comprados visibles
+- Skin equipada visible
+- Acciones cambian cada 5 min
+- Easter egg: Muy raramente atiende paciente → Logro "PSPIA"
 
-## Futuras Mejoras
+### PSYKEA (tienda):
+- Correo de PSYKAT con catálogo adjunto
+- Muebles con nombres de psicólogos (Silla Rorschach, Diván Freud)
+- Se compran con monedas
+- Aparecen en la consulta
 
-### Funcionalidades Planificadas
-- [ ] **Sistema de notas** durante las sesiones
-- [ ] **Estadísticas detalladas** de rendimiento
-- [ ] **Modo multijugador** (comparación de diagnósticos)
-- [ ] **Casos históricos** con personajes reales
-- [ ] **Integración con API** de IA para respuestas más sofisticadas
-- [ ] **Exportación de casos** para análisis académico
+## 10. Sistema de Logros
 
-### Mejoras Técnicas
-- [ ] **PWA** (Progressive Web App)
-- [ ] **Offline mode** completo
-- [ ] **Sincronización** en la nube
-- [ ] **Multiidioma** (inglés, portugués)
+### Por diagnóstico:
+- **Iniciado**: 1 caso fácil resuelto
+- **Competente**: 1 caso difícil resuelto
+- **Experto**: 3 casos difíciles
+- **Profesional**: 5 casos realistas
 
-## Contribuciones
+### Especiales:
+- Casos colaborativos: Logro aparte
+- PSPIA: Ver a PSYKAT atendiendo paciente (oculto)
+- Fidelización: Atender paciente recurrente
 
-Este proyecto está diseñado como una herramienta educativa. Las contribuciones son bienvenidas para:
-- Mejorar la precisión clínica
-- Añadir nuevos casos y trastornos
-- Optimizar la experiencia de usuario
-- Implementar nuevas funcionalidades
+### Dentro de cada logro:
+- Casos resueltos
+- Perfil del paciente
+- Archivos generados
+- Ver conversación completa
 
-## Licencia
+## 11. Rankings y Red Social
+
+- Ranking global (mundial)
+- Ranking por universidad (#hashtag)
+- Casos destacados (graciosos/exitosos)
+- Compartir en redes (opcional)
+
+## 12. Monetización
+
+### Free:
+- Entrenamiento ilimitado
+- Normal: 2 casos/día
+- Difícil: 1 caso/día
+- Ads en TubeTok
+
+### Premium:
+- Todos los modos ilimitados
+- Sin ads
+- Revisión de caso (modo lectura)
+- Skins anticipadas
+- Urgencias con XP doble
+
+### Universidades partner:
+- Premium gratis para estudiantes
+
+---
+
+## 13. Arquitectura de IA
+
+### Sistema Actual (v1.0)
+
+```
+┌─────────────────────────────────────────────┐
+│  App PSYKAT (Cliente React Native)          │
+│  - API Key en AsyncStorage                  │
+│  - Llamadas directas a Groq                 │
+│  - Fallback a respuestas locales            │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│  Groq API (llama-3.1-8b-instant)            │
+│  - System prompt contextualizado            │
+│  - Historial de conversación (10 msgs)      │
+│  - Temperatura según dificultad             │
+└─────────────────────────────────────────────┘
+```
+
+### Funciones de IA Implementadas
+| Función | Estado | Descripción |
+|---------|--------|-------------|
+| `generateResponse()` | ✅ | Respuestas de paciente en chat |
+| `testConnection()` | ✅ | Verificar conexión a API |
+| `generatePatientSeed()` | ❌ | Generar datos de paciente |
+| `generateReview()` | ❌ | Feedback post-caso del paciente |
+| `generateCaseEmail()` | ❌ | Generar correos de nuevos casos |
+| `generateSupervisorFeedback()` | ❌ | Dr. Domingo analiza el caso |
+
+### Sistema Objetivo (v2.0 - Producción)
+
+```
+┌─────────────────────────────────────────────┐
+│  App PSYKAT (Cliente)                       │
+│  - SIN API key en cliente                   │
+│  - Autenticación con Supabase               │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│  Supabase Edge Functions                    │
+│  - API Key segura en servidor               │
+│  - Rate limiting por usuario/plan           │
+│  - Control de costos                        │
+│  - Logs para facturación                    │
+│  - Caché de respuestas similares            │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│  Groq API / OpenAI / Anthropic              │
+└─────────────────────────────────────────────┘
+```
+
+### Prompts por Mecánica
+
+| Mecánica | Tipo de Prompt | Prioridad |
+|----------|---------------|-----------|
+| Chat paciente | Roleplay inmersivo | ✅ Implementado |
+| Generación de seeds | Creación de personaje | Alta |
+| Reviews post-caso | Evaluación emocional | Alta |
+| Correos/casos nuevos | Escritura formal | Media |
+| Dr. Domingo feedback | Análisis clínico | Media |
+
+---
+
+## 14. Stack Técnico
+
+| Capa | Tecnología | Estado |
+|------|------------|--------|
+| Framework | React Native 0.81.5 + Expo 54 | ✅ |
+| Lenguaje | TypeScript 5.9.2 | ✅ |
+| Estado | Context API + useReducer | ✅ |
+| Navegación | React Navigation 7.0 | ✅ |
+| Storage | AsyncStorage (v1) | ✅ |
+| Storage | Supabase (v2) | ❌ Pendiente |
+| IA | Groq API (Llama 3.1) | ✅ |
+| Build | Expo EAS | ✅ |
+
+---
+
+## 15. Estado Actual del Proyecto
+
+### Fase 1: Core Funcional (v1.0) - 85% Completado
+
+| Tarea | Estado | Notas |
+|-------|--------|-------|
+| Estructura del proyecto | ✅ | React Native + TypeScript |
+| MailScreen | ✅ | Casos por dificultad, agencias |
+| ContactsScreen | ✅ | Lista alfabética, badges |
+| ChatScreen | ✅ | Chat con IA, 5 preguntas/sesión |
+| Integrar Groq | ✅ | Con fallback local |
+| Sistema de monedas | ✅ | Ganancia/gasto funcional |
+| Baterías de tests | ✅ | PHQ-9, GAD-7, etc. (simulados) |
+| Herramienta Diagnóstico | ✅ | DSM-5-TR con % coincidencia |
+| Herramienta Tratamiento | ✅ | Selección y envío |
+| Sistema de espera | ✅ | Timer implementado (5s dev) |
+| **ResultsScreen** | ⚠️ 30% | Review básica, falta completar |
+
+### Fase 2: Gamificación (v1.5) - No iniciado
+
+| Tarea | Estado |
+|-------|--------|
+| App Consulta | ❌ |
+| PSYKEA (tienda) | ❌ |
+| Skins del gato | ❌ |
+| Sistema de logros | ❌ |
+| Estadísticas usuario | ❌ |
+| Modo Entrenamiento mejorado | ❌ |
+| Sistema de urgencias | ❌ |
+| Pacientes recurrentes | ❌ |
+
+### Fase 3: Contenido Especial (v2.0) - No iniciado
+
+| Tarea | Estado |
+|-------|--------|
+| Modo Histórico (agencias) | ❌ |
+| Nombres aleatorios IA | ❌ |
+| Biblioteca de casos | ⚠️ Parcial |
+| Caso colaborativo | ❌ |
+| Rankings | ❌ |
+| Supabase Auth + Sync | ❌ |
+| Multi-idioma | ❌ |
+
+### Fase 4: Pulido (v2.5) - No iniciado
+
+| Tarea | Estado |
+|-------|--------|
+| Onboarding/Tutorial | ❌ |
+| Logro PSPIA | ❌ |
+| Accesibilidad completa | ❌ |
+| Exportar PDF | ❌ |
+| Modo examen | ❌ |
+
+---
+
+## 16. Problemas Conocidos
+
+### Críticos (resolver antes de producción)
+1. **API Key hardcodeada** en `AIContext.tsx:14` - Debe migrarse a backend
+2. **DEV_MODE activo** en `AppContext.tsx` - Monedas infinitas, level 10
+
+### Importantes
+1. Timer de tratamiento en 5 segundos (debe ser 2 días en prod)
+2. Sistema de rapport existe pero no afecta activamente las respuestas
+3. Límites de casos simultáneos no validados contra máximos
+
+### Mejoras Pendientes
+1. Logging estructurado para debugging
+2. Retry logic en errores de IA
+3. Caché de respuestas frecuentes
+4. Notificaciones push reales
+
+---
+
+## 17. Estructura del Proyecto
+
+```
+PSYKAT3.0/
+├── README.md                    # Este archivo
+├── N8N_INTEGRATION.md          # Guía alternativa n8n
+└── react/
+    ├── App.tsx                  # Root navigator
+    ├── package.json             # Dependencies
+    ├── tsconfig.json            # TypeScript config
+    ├── app.json                 # Expo config
+    └── src/
+        ├── contexts/
+        │   ├── AppContext.tsx   # Estado global
+        │   └── AIContext.tsx    # Integración IA
+        ├── types/
+        │   ├── index.ts         # Tipos principales
+        │   └── navigation.ts    # Tipos de navegación
+        ├── data/
+        │   ├── mockData.ts      # Backstories, saludos
+        │   └── clinicalData.ts  # DSM-5, síntomas, tests
+        └── screens/
+            ├── LockScreen.tsx
+            ├── DesktopScreen.tsx
+            ├── MessagingScreen.tsx
+            ├── ChatScreen.tsx
+            ├── MailScreen.tsx
+            ├── ContactsScreen.tsx
+            ├── DiagnosisScreen.tsx
+            ├── TreatmentScreen.tsx
+            ├── PsykTokScreen.tsx
+            ├── DiaryScreen.tsx
+            ├── SettingsScreen.tsx
+            └── ResultsScreen.tsx
+```
+
+---
+
+## 18. Instalación y Desarrollo
+
+```bash
+# Clonar repositorio
+git clone <repo-url>
+cd PSYKAT3.0/react
+
+# Instalar dependencias
+npm install
+
+# Iniciar en desarrollo
+npx expo start
+
+# Para iOS
+npx expo start --ios
+
+# Para Android
+npx expo start --android
+```
+
+---
+
+## 19. Licencia
 
 Proyecto educativo - No comercial
-© 2024 PSYKAT - Mobile Therapist Simulator
-
-## Agradecimientos
-
-- **DSM-5-TR** por los criterios diagnósticos
-- **Comunidad psicológica** por el feedback
-- **Open source libraries** utilizadas
-- **Colaboradores** y beta testers
+© 2024-2025 PSYKAT - Mobile Therapist Simulator
 
 ---
 

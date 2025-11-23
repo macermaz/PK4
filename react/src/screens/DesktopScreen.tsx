@@ -77,7 +77,7 @@ const DesktopScreen: React.FC = () => {
       name: 'Correo',
       icon: 'envelope',
       color: '#007AFF',
-      badge: state.cases.filter(c => c.status === 'new').length,
+      badge: state.cases.filter(c => c.status === 'new').length + 3, // +3 correos iniciales
     },
     {
       id: 'contacts',
@@ -91,7 +91,7 @@ const DesktopScreen: React.FC = () => {
       name: 'Mensajería',
       icon: 'comments',
       color: '#34B7F1',
-      badge: state.cases.filter(c => c.status === 'active').length,
+      badge: state.cases.filter(c => c.status === 'active' || c.status === 'diagnosed' || c.status === 'awaiting_treatment').length,
     },
     {
       id: 'tubetok',
@@ -102,14 +102,14 @@ const DesktopScreen: React.FC = () => {
     {
       id: 'diary',
       name: 'Diario',
-      icon: 'book-medical',
+      icon: 'book',
       color: '#8B5CF6',
     },
     {
-      id: 'calls',
-      name: 'Llamadas',
-      icon: 'phone',
-      color: '#FF8C42',
+      id: 'consulta',
+      name: 'Consulta',
+      icon: 'video-camera',
+      color: '#00BCD4',
     },
     {
       id: 'achievements',
@@ -125,14 +125,22 @@ const DesktopScreen: React.FC = () => {
     },
   ];
 
-  // Dock apps
+  // Dock apps - Correo, Mensajes, Contactos
   const dockApps: AppIcon[] = [
     {
+      id: 'mail',
+      name: 'Correo',
+      icon: 'envelope',
+      color: '#007AFF',
+      badge: state.cases.filter(c => c.status === 'new').length + 3,
+      isDock: true,
+    },
+    {
       id: 'messaging',
-      name: 'Mensajería',
+      name: 'Mensajes',
       icon: 'comments',
       color: '#34B7F1',
-      badge: state.cases.filter(c => c.status === 'active').length,
+      badge: state.cases.filter(c => c.status === 'active' || c.status === 'diagnosed' || c.status === 'awaiting_treatment').length,
       isDock: true,
     },
     {
@@ -142,18 +150,26 @@ const DesktopScreen: React.FC = () => {
       color: '#4CAF50',
       isDock: true,
     },
-    {
-      id: 'diary',
-      name: 'Diario',
-      icon: 'book-medical',
-      color: '#8B5CF6',
-      isDock: true,
-    },
   ];
+
+  // Mapeo de IDs a rutas de navegación
+  const appRoutes: Record<string, keyof RootStackParamList> = {
+    mail: 'Mail',
+    contacts: 'Contacts',
+    messaging: 'Messaging',
+    tubetok: 'PsykTok',
+    diary: 'Diary',
+    consulta: 'Desktop', // TODO: Implementar ConsultaScreen (cámara PSYKAT)
+    achievements: 'Desktop', // TODO: Implementar AchievementsScreen
+    settings: 'Settings',
+  };
 
   // Navegar a aplicación
   const openApp = (appId: string) => {
-    navigation.navigate(appId as any);
+    const route = appRoutes[appId];
+    if (route && route !== 'Desktop') {
+      navigation.navigate(route as any);
+    }
   };
 
   // Renderizar icono de aplicación
@@ -202,25 +218,19 @@ const DesktopScreen: React.FC = () => {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      {/* Barra de estado */}
-      <View style={styles.statusBar}>
-        <Text style={styles.statusTime}>{formatTime(currentTime)}</Text>
-        <View style={styles.statusIcons}>
-          <Icon name="wifi" size={16} color="white" style={styles.statusIcon} />
-          <Icon name="battery-three-quarters" size={16} color="white" />
-        </View>
-      </View>
 
-      {/* Grid de aplicaciones */}
-      <ScrollView 
-        contentContainerStyle={styles.appGrid}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.appGridContent}>
-          {apps.map((app, index) => renderAppIcon(app, index))}
-        </View>
-      </ScrollView>
+      {/* SafeArea para evitar superposición con barra del sistema */}
+      <SafeAreaView style={styles.safeArea}>
+        {/* Grid de aplicaciones */}
+        <ScrollView
+          contentContainerStyle={styles.appGrid}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.appGridContent}>
+            {apps.map((app, index) => renderAppIcon(app, index))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
 
       {/* Dock inferior */}
       <LinearGradient
@@ -230,7 +240,7 @@ const DesktopScreen: React.FC = () => {
         <View style={styles.dockContent}>
           {dockApps.map((app, index) => renderAppIcon(app, index + apps.length, true))}
         </View>
-        
+
         {/* Indicador de swipe */}
         <View style={styles.swipeIndicator} />
       </LinearGradient>
@@ -242,24 +252,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  statusTime: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIcon: {
-    marginRight: 8,
+  safeArea: {
+    flex: 1,
   },
   appGrid: {
     flexGrow: 1,

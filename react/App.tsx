@@ -21,6 +21,7 @@ import PsykTokScreen from './src/screens/PsykTokScreen';
 import DiaryScreen from './src/screens/DiaryScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import TreatmentScreen from './src/screens/TreatmentScreen';
 
 // Importar tipos de navegación
 import { RootStackParamList } from './src/types/navigation';
@@ -73,6 +74,7 @@ export default function App() {
                 <Stack.Screen name="Mail" component={MailScreen} />
                 <Stack.Screen name="Contacts" component={ContactsScreen} />
                 <Stack.Screen name="Diagnosis" component={DiagnosisScreen} />
+                <Stack.Screen name="Treatment" component={TreatmentScreen} />
                 <Stack.Screen name="PsykTok" component={PsykTokScreen} />
                 <Stack.Screen name="Diary" component={DiaryScreen} />
                 <Stack.Screen name="Results" component={ResultsScreen} />
