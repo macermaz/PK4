@@ -23,7 +23,7 @@ const ENV_CONFIG = {
   development: {
     // API Key de desarrollo (solo para testing local)
     // ADVERTENCIA: Esta key se expone en el cliente. Solo usar en desarrollo.
-    GROQ_API_KEY: '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',
+    GROQ_API_KEY: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
 
     // Timers cortos para testing
     TREATMENT_WAIT_MS: 5000, // 5 segundos
