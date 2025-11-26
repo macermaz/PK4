@@ -22,26 +22,43 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { useApp, DEV_MODE } from '../contexts/AppContext';
 import { useAI } from '../contexts/AIContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { RootStackParamList } from '../types/navigation';
-import { Case, Message, CaseNote } from '../types';
+import { Case, Message, CaseNote, Gender } from '../types';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { patientGreetings } from '../data/mockData';
-import { getTestsByDifficulty, generateTestReport, PsychTest } from '../data/clinicalData';
+import { formatWithGender } from '../utils/genderUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH * 0.85;
 
-// Saludos profesionales del terapeuta
-const therapistGreetings = [
-  "Buenos días, soy el/la profesional que le atenderá hoy. ¿Tiene unos minutos para hablar?",
-  "Hola, bienvenido/a. Soy su terapeuta asignado/a. ¿Cómo se encuentra hoy?",
-  "Buenos días. Me alegra que haya venido. ¿Podemos comenzar la sesión?",
-  "Hola, gracias por venir. Estoy aquí para escucharle. ¿Cómo le va?",
-  "Bienvenido/a a consulta. Soy quien le acompañará en este proceso. ¿Qué le trae hoy?",
+// Saludos profesionales del terapeuta - Primera sesión (con templates de género)
+const therapistFirstGreetings = [
+  "Buenos días. Me han comentado que viene por primera vez. Tómese su tiempo, estoy aquí para escuchar{lo/la}.",
+  "Hola, bienvenid{o/a}. Sé que dar el primer paso no es fácil. ¿Cómo se encuentra hoy?",
+  "Buenos días. He leído un poco sobre su caso. Me gustaría que me contara con sus palabras qué {lo/la} trae aquí.",
+  "Hola, gracias por venir. Antes de empezar, ¿hay algo que le gustaría saber sobre cómo trabajaremos?",
+  "Bienvenid{o/a}. He visto las notas de recepción. Cuénteme, ¿qué es lo que más le preocupa ahora mismo?",
 ];
 
-// Mensajes automáticos contextuales según el trastorno
-const getContextualAutoMessage = (disorder: string, messagesCount: number): string => {
+// Saludos para sesiones de seguimiento
+const therapistFollowUpGreetings = [
+  "Hola de nuevo. ¿Cómo ha estado desde nuestra última sesión?",
+  "Buenos días. Me alegra ver{lo/la} de vuelta. ¿Ha pasado algo desde la última vez?",
+  "Hola. ¿Cómo se ha sentido estos días? ¿Ha pensado en lo que hablamos?",
+  "Bienvenid{o/a} de nuevo. ¿Qué tal han ido las cosas desde que nos vimos?",
+  "Hola. Antes de continuar, ¿hay algo urgente que quiera contarme hoy?",
+];
+
+// Función para obtener saludo según contexto y género
+const getTherapistGreeting = (sessionCount: number, patientGender: Gender): string => {
+  const templates = sessionCount === 0 ? therapistFirstGreetings : therapistFollowUpGreetings;
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  return formatWithGender(template, patientGender);
+};
+
+// Mensajes automáticos contextuales según el trastorno (con templates de género)
+const getContextualAutoMessage = (disorder: string, messagesCount: number, gender: Gender): string => {
   const disorderMessages: Record<string, string[]> = {
     'depresion_mayor': [
       "A veces me cuesta encontrar las palabras...",
@@ -50,7 +67,7 @@ const getContextualAutoMessage = (disorder: string, messagesCount: number): stri
       "Me quedé pensando... perdón por el silencio.",
     ],
     'trastorno_ansiedad_generalizada': [
-      "Perdón, me puse nervioso/a pensando en qué decir...",
+      "Perdón, me puse nervios{o/a} pensando en qué decir...",
       "Disculpe, estaba tratando de ordenar mis pensamientos...",
       "Me cuesta concentrarme cuando hablo de esto...",
       "Lo siento, mi mente estaba en otro lado...",
@@ -61,8 +78,8 @@ const getContextualAutoMessage = (disorder: string, messagesCount: number): stri
       "Estaba tratando de mantener la calma...",
     ],
     'fobia_social': [
-      "Perdón, me cuesta hablar de mí mismo/a...",
-      "Disculpe, me pongo nervioso/a en estas situaciones...",
+      "Perdón, me cuesta hablar de mí mism{o/a}...",
+      "Disculpe, me pongo nervios{o/a} en estas situaciones...",
       "Es incómodo para mí, pero quiero seguir...",
     ],
     'tept': [
@@ -82,21 +99,35 @@ const getContextualAutoMessage = (disorder: string, messagesCount: number): stri
     "Disculpe, me costó organizar mis ideas...",
     "Lo siento, necesitaba un momento...",
     "Estaba reflexionando sobre lo que me preguntó...",
-    "Perdón, me quedé pensativo/a...",
+    "Perdón, me quedé pensativ{o/a}...",
   ];
 
   const messages = disorderMessages[disorder] || genericMessages;
-  return messages[Math.floor(Math.random() * messages.length)];
+  const template = messages[Math.floor(Math.random() * messages.length)];
+  return formatWithGender(template, gender);
 };
 
-// Mensaje de disculpa al cancelar caso
-const getCancellationMessage = (patientName: string): string => {
-  const messages = [
-    `Estimado/a ${patientName}, lamentablemente debo derivar su caso a otro profesional. Le deseo lo mejor en su proceso terapéutico.`,
-    `${patientName}, por razones profesionales, su caso será atendido por otro colega. Gracias por su confianza.`,
-    `Apreciado/a ${patientName}, le informo que derivaré su caso. Otro profesional continuará su atención.`,
+// Mensajes de derivación - más empáticos y profesionales (con templates de género)
+const getCancellationMessage = (patientName: string, sessionCount: number, patientGender: Gender, therapistGender: Gender): string => {
+  // Si es la primera sesión
+  if (sessionCount === 0) {
+    const firstSessionMessages = [
+      `${patientName}, tras nuestra conversación inicial, creo que {un/una} colega podría ayudar{lo/la} mejor con su situación. No es un reflejo de usted, sino de encontrar el mejor encaje terapéutico. {Lo/La} derivaré con alguien especializad{o/a}.`,
+      `Estimad{o/a} ${patientName}, quiero ser honest${therapistGender === 'feminine' ? 'a' : 'o'}: creo que hay {un/una} profesional más adecuad{o/a} para su caso. Esto no significa que su situación no sea importante, al contrario. Merece la mejor atención posible.`,
+      `${patientName}, después de escuchar{lo/la}, considero que {un/una} compañer{o/a} tiene más experiencia en este tipo de casos. {Lo/La} contactarán pronto. Gracias por compartir conmigo.`,
+    ];
+    const template = firstSessionMessages[Math.floor(Math.random() * firstSessionMessages.length)];
+    return formatWithGender(template, patientGender);
+  }
+
+  // Si ya llevamos varias sesiones
+  const ongoingMessages = [
+    `${patientName}, hemos trabajado junt${therapistGender === 'feminine' ? 'as' : 'os'} y valoro lo que hemos avanzado. Por circunstancias que no puedo controlar, debo derivar su caso. Otr${therapistGender === 'feminine' ? 'a' : 'o'} profesional continuará desde donde lo dejamos.`,
+    `Estimad{o/a} ${patientName}, lamento comunicarle que debo transferir su caso a otr${therapistGender === 'feminine' ? 'a' : 'o'} colega. Todo su progreso quedará documentado. Ha sido un placer trabajar con usted.`,
+    `${patientName}, por motivos profesionales no podré continuar como su terapeuta. Quiero que sepa que el trabajo que ha hecho es valioso. Mi colega retomará donde lo dejamos.`,
   ];
-  return messages[Math.floor(Math.random() * messages.length)];
+  const template = ongoingMessages[Math.floor(Math.random() * ongoingMessages.length)];
+  return formatWithGender(template, patientGender);
 };
 
 type ChatNavigationProp = StackNavigationProp<RootStackParamList, 'Chat'>;
@@ -106,7 +137,8 @@ const ChatScreen: React.FC = () => {
   const route = useRoute<ChatRouteProp>();
   const navigation = useNavigation<ChatNavigationProp>();
   const { state, dispatch, addMessage, generateId } = useApp();
-  const { generateResponse, detectLifeAspects } = useAI();
+  const { generateResponse, detectLifeAspects, generateFarewellMessage } = useAI();
+  const { showNotification } = useNotifications();
   const { caseId } = route.params;
 
   const [currentCase, setCurrentCase] = useState<Case | null>(null);
@@ -114,7 +146,6 @@ const ChatScreen: React.FC = () => {
   const [questionsCount, setQuestionsCount] = useState(0);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
-  const [showTestsModal, setShowTestsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [noteType, setNoteType] = useState<'symptom' | 'observation' | 'general'>('general');
@@ -199,6 +230,11 @@ const ChatScreen: React.FC = () => {
       setCurrentCase(case_);
       setQuestionsCount(case_.questionsThisSession || 0);
 
+      // Marcar mensajes como leídos al abrir el chat
+      if (case_.unreadCount > 0) {
+        dispatch({ type: 'MARK_MESSAGES_READ', payload: caseId });
+      }
+
       // Si no hay mensajes, añadir saludo inicial
       if (case_.messages.length === 0) {
         addInitialMessage(case_);
@@ -217,8 +253,10 @@ const ChatScreen: React.FC = () => {
 
   // Añadir mensaje inicial - El terapeuta inicia la conversación
   const addInitialMessage = async (case_: Case) => {
-    // Primero el terapeuta saluda profesionalmente
-    const therapistGreeting = therapistGreetings[Math.floor(Math.random() * therapistGreetings.length)];
+    const sessionCount = case_.sessions || 0;
+
+    // Saludo del terapeuta según contexto (primera vez o seguimiento)
+    const therapistGreeting = getTherapistGreeting(sessionCount, case_.patient.gender);
     const therapistMessage: Message = {
       id: generateId(),
       text: therapistGreeting,
@@ -238,9 +276,10 @@ const ChatScreen: React.FC = () => {
       },
     });
 
-    // Después de 2-4 segundos, el paciente responde
+    // Después de 2-4 segundos, el paciente responde con saludo contextual
     setTimeout(() => {
-      const patientGreeting = patientGreetings[Math.floor(Math.random() * patientGreetings.length)];
+      // Generar saludo contextual basado en trastorno y backstory
+      const patientGreeting = getContextualPatientGreeting(case_);
       const patientMessage: Message = {
         id: generateId(),
         text: patientGreeting,
@@ -253,6 +292,90 @@ const ChatScreen: React.FC = () => {
       // Iniciar el timer de mensaje automático
       startAutoMessageTimer(case_);
     }, 2000 + Math.random() * 2000);
+  };
+
+  // Obtener saludo contextual del paciente basado en su situación (con género)
+  const getContextualPatientGreeting = (case_: Case): string => {
+    const { patient, sessions = 0 } = case_;
+    const disorder = patient.disorder;
+    const gender = patient.gender;
+
+    // Primera sesión - referencias al backstory o motivo de consulta
+    if (sessions === 0) {
+      // Saludos específicos por trastorno que referencian el contexto (con templates de género)
+      const contextualGreetings: Record<string, string[]> = {
+        'trastorno_depresivo_mayor': [
+          "Hola... Perdone, me costó mucho decidirme a venir. No sé si esto pueda ayudarme realmente.",
+          "Buenos días, {doctor/doctora}. Mi familia insistió en que viniera... Ya no sé qué más hacer.",
+          "Gracias por verme. Me dijeron que podría hablar de lo que me pasa... aunque no sé por dónde empezar.",
+        ],
+        'trastorno_ansiedad_generalizada': [
+          "Hola, perdone si parezco nervios{o/a}, es que... bueno, así soy siempre últimamente.",
+          "Buenos días. Llevaba semanas posponiendo esta cita, pero ya no aguanto más así.",
+          "Gracias por recibirme. He probado de todo para calmarme, pero nada funciona.",
+        ],
+        'trastorno_panico': [
+          "Hola... ¿Le importa si me siento cerca de la puerta? Es que... tengo una cosa con los espacios.",
+          "Buenos días. Casi no vengo, me dio uno de esos... ataques... en el camino.",
+          "Gracias por la cita. Necesito ayuda urgente, estos ataques están arruinando mi vida.",
+        ],
+        'fobia_social': [
+          "[en voz baja] Hola... Perdone, me cuesta mucho hablar con gente nueva.",
+          "Buenos días, {doctor/doctora}. He tardado meses en atreverme a pedir cita.",
+          "Hola... Espero no parecer muy rar{o/a}, es solo que estas situaciones me cuestan mucho.",
+        ],
+        'tept': [
+          "Hola. [mira a su alrededor] ¿Podemos cerrar la puerta? Me siento más segur{o/a} así.",
+          "Buenos días. Me recomendaron venir después de... lo que pasó. Aún me cuesta hablarlo.",
+          "Gracias por verme. Desde el incidente, no soy {el/la} mism{o/a} persona.",
+        ],
+        'trastorno_obsesivo_compulsivo': [
+          "Hola. Perdone la tardanza, tuve que... verificar algunas cosas antes de salir.",
+          "Buenos días. ¿Puedo usar gel desinfectante? Lo siento, es más fuerte que yo.",
+          "Gracias por la cita. Sé que lo que me pasa no tiene sentido, pero no puedo controlarlo.",
+        ],
+        'trastorno_limite_personalidad': [
+          "Hola. Espero que usted sí pueda ayudarme, porque los anteriores no sirvieron de nada.",
+          "Buenos días. [emocionalmente intens{o/a}] Necesito hablar con alguien que me entienda de verdad.",
+          "Gracias por verme. Mi vida es un caos ahora mismo y no sé qué hacer.",
+        ],
+        'trastorno_bipolar_i': [
+          "Hola, {doctor/doctora}. Vengo porque mi familia está preocupada... otra vez.",
+          "Buenos días. Me dijeron que tenía que venir después de lo que pasó el mes pasado.",
+          "Gracias por la cita. Necesito estabilizarme, no puedo seguir con estos altibajos.",
+        ],
+        'anorexia_nerviosa': [
+          "Hola. Mi madre me obligó a venir, pero yo estoy bien.",
+          "Buenos días. Supongo que ya le han dicho por qué estoy aquí... no estoy de acuerdo.",
+          "Gracias por verme. Vengo porque mi familia está preocupada, aunque yo me veo normal.",
+        ],
+        'trastorno_consumo_alcohol': [
+          "Hola, {doctor/doctora}. Vengo porque me han dado un ultimátum en casa.",
+          "Buenos días. No creo que tenga un problema real, pero todos insisten en que venga.",
+          "Gracias por la cita. Quiero demostrar que puedo manejarlo... aunque necesite un poco de ayuda.",
+        ],
+      };
+
+      const greetings = contextualGreetings[disorder] || [
+        "Hola, {doctor/doctora}. Gracias por verme.",
+        "Buenos días. No sabía muy bien qué esperar de esto.",
+        "Hola. Me costó decidirme a pedir ayuda, pero aquí estoy.",
+      ];
+
+      const template = greetings[Math.floor(Math.random() * greetings.length)];
+      return formatWithGender(template, gender);
+    }
+
+    // Sesiones de seguimiento
+    const followUpGreetings = [
+      "Hola de nuevo. He estado pensando en lo que hablamos la última vez.",
+      "Buenos días. Ha sido una semana interesante... tengo cosas que contarle.",
+      "Hola, {doctor/doctora}. Intenté hacer lo que me sugirió, con resultados mixtos.",
+      "Gracias por verme de nuevo. Las cosas han cambiado un poco desde la última sesión.",
+    ];
+
+    const template = followUpGreetings[Math.floor(Math.random() * followUpGreetings.length)];
+    return formatWithGender(template, gender);
   };
 
   // Timer para mensaje automático si no hay respuesta en 90 segundos
@@ -270,7 +393,8 @@ const ChatScreen: React.FC = () => {
       if (timeSinceLastMessage >= 90000 && case_.status === 'active') {
         const autoMessage = getContextualAutoMessage(
           case_.patient.disorder,
-          case_.messages.length
+          case_.messages.length,
+          case_.patient.gender
         );
 
         const message: Message = {
@@ -379,6 +503,33 @@ const ChatScreen: React.FC = () => {
       // Reiniciar el timer de mensaje automático
       startAutoMessageTimer(currentCase);
 
+      // Si fue la 5ta pregunta, enviar mensaje de despedida después de 2 segundos
+      if (newCount === 5) {
+        setTimeout(async () => {
+          try {
+            const farewellText = await generateFarewellMessage(currentCase);
+            const farewellMessage: Message = {
+              id: generateId(),
+              text: farewellText,
+              sender: 'patient',
+              timestamp: new Date(),
+              type: 'text',
+            };
+            addMessage(currentCase.id, farewellMessage);
+
+            // Notificar al usuario que la sesión terminó
+            showNotification({
+              type: 'message',
+              title: currentCase.patient.name,
+              body: 'La sesión ha terminado. Revisa la Herramienta Diagnóstica para continuar.',
+              data: { caseId: currentCase.id },
+            });
+          } catch (err) {
+            console.error('Error generating farewell:', err);
+          }
+        }, 2000);
+      }
+
     } catch (error) {
       console.error('Error generando respuesta:', error);
 
@@ -441,32 +592,11 @@ const ChatScreen: React.FC = () => {
     setNoteType('general');
   };
 
-  // Herramientas disponibles
+  // Herramientas disponibles - Solo notas (Diagnóstico y Tests están en DiagnosticToolScreen)
   const tools = [
     {
-      id: 'diagnosis',
-      title: 'Diagnóstico',
-      icon: 'stethoscope',
-      color: '#9C27B0',
-      onPress: () => {
-        setShowToolsMenu(false);
-        navigation.navigate('Diagnosis', { caseId: currentCase!.id });
-      },
-    },
-    {
-      id: 'tests',
-      title: 'Tests',
-      icon: 'clipboard',
-      color: '#2196F3',
-      onPress: () => {
-        setShowToolsMenu(false);
-        setShowTestsModal(true);
-      },
-      badge: state.user.coins,
-    },
-    {
       id: 'notes',
-      title: 'Notas',
+      title: 'Notas Clínicas',
       icon: 'pencil',
       color: '#FF9800',
       onPress: () => {
@@ -476,176 +606,17 @@ const ChatScreen: React.FC = () => {
       badge: currentCase?.notes?.length || 0,
     },
     {
-      id: 'treatment',
-      title: 'Tratamiento',
-      icon: 'medkit',
-      color: '#4CAF50',
-      disabled: !currentCase?.diagnosis,
+      id: 'expediente',
+      title: 'Ver Expediente',
+      icon: 'folder-open',
+      color: '#4A90E2',
       onPress: () => {
-        if (!currentCase?.diagnosis) {
-          Alert.alert('Diagnóstico requerido', 'Debes realizar un diagnóstico antes de proponer un tratamiento.');
-          return;
-        }
         setShowToolsMenu(false);
-        navigation.navigate('Treatment', { caseId: currentCase!.id });
+        openPanel();
       },
     },
   ];
 
-  // Tests disponibles según dificultad del caso
-  const getAvailableTests = (): PsychTest[] => {
-    if (!currentCase) return [];
-    return getTestsByDifficulty(currentCase.difficulty);
-  };
-
-  // Verificar si se pueden aplicar tests
-  const canApplyTests = (): boolean => {
-    if (!currentCase) return false;
-    const testsCount = currentCase.testsApplied?.length || 0;
-    return questionsCount >= 5 && testsCount < 2;
-  };
-
-  const getTestsRemaining = (): number => {
-    if (!currentCase) return 0;
-    return 2 - (currentCase.testsApplied?.length || 0);
-  };
-
-  const applyTest = (test: PsychTest) => {
-    // Verificar que se hayan hecho las 5 preguntas
-    if (questionsCount < 5) {
-      Alert.alert(
-        'Sesión incompleta',
-        'Debes completar las 5 preguntas de la sesión antes de aplicar tests psicológicos.'
-      );
-      return;
-    }
-
-    // Verificar límite de 2 tests
-    const testsCount = currentCase?.testsApplied?.length || 0;
-    if (testsCount >= 2) {
-      Alert.alert(
-        'Límite de tests alcanzado',
-        'Solo puedes aplicar un máximo de 2 tests por caso.'
-      );
-      return;
-    }
-
-    // Verificar si el test ya fue aplicado
-    if (currentCase?.testsApplied?.includes(test.id)) {
-      Alert.alert('Test ya aplicado', `Ya has aplicado ${test.name} a este paciente.`);
-      return;
-    }
-
-    if (state.user.coins < test.cost) {
-      Alert.alert('Monedas insuficientes', `Necesitas ${test.cost} monedas para aplicar ${test.name}`);
-      return;
-    }
-
-    Alert.alert(
-      `Aplicar ${test.name}`,
-      `¿Deseas aplicar ${test.fullName} por ${test.cost} monedas?\n\nEvalúa: ${test.evaluates}\nÍtems: ${test.items}\n\nTests restantes: ${2 - testsCount - 1}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Aplicar',
-          onPress: () => {
-            dispatch({ type: 'SPEND_COINS', payload: test.cost });
-
-            // Generar resultado realista según dificultad y trastorno del paciente
-            const testResult = generateTestReport(
-              test.id,
-              currentCase!.difficulty,
-              currentCase!.patient.disorder
-            );
-
-            const result = {
-              testId: test.id,
-              testName: test.name,
-              score: testResult.score,
-              interpretation: testResult.interpretation,
-              date: new Date().toISOString(),
-            };
-
-            // Actualizar tests aplicados (array)
-            const updatedTestsApplied = [...(currentCase!.testsApplied || []), test.id];
-            const updatedTestsResults = [...(currentCase!.testsResults || []), result];
-
-            dispatch({
-              type: 'UPDATE_CASE',
-              payload: {
-                id: currentCase!.id,
-                updates: {
-                  testsApplied: updatedTestsApplied,
-                  testsResults: updatedTestsResults,
-                },
-              },
-            });
-
-            // Añadir mensaje de que se envió el test
-            const sendTestMessage: Message = {
-              id: generateId(),
-              text: `📋 He enviado el cuestionario ${test.name} (${test.fullName}) para que lo complete.`,
-              sender: 'user',
-              timestamp: new Date(),
-              type: 'text',
-            };
-            addMessage(currentCase!.id, sendTestMessage);
-
-            // En modo dev, respuesta rápida (5 segundos), en prod 2 minutos
-            const waitTime = DEV_MODE ? 5000 : 120000;
-
-            if (testNotificationTimeoutRef.current) {
-              clearTimeout(testNotificationTimeoutRef.current);
-            }
-
-            testNotificationTimeoutRef.current = setTimeout(() => {
-              // Mensaje con los resultados del test
-              const resultMessage: Message = {
-                id: generateId(),
-                text: `📋 Resultados de ${test.name}:\n\n${testResult.interpretation}`,
-                sender: 'patient',
-                timestamp: new Date(),
-                type: 'results',
-                score: testResult.score,
-              };
-              addMessage(currentCase!.id, resultMessage);
-
-              // Después de 2 segundos, mensaje pidiendo nueva sesión
-              setTimeout(() => {
-                const sessionRequestMessages = [
-                  `Doctor/a, me gustaría hablar más sobre esto en nuestra próxima sesión. ¿Cuándo podemos vernos?`,
-                  `Creo que necesito otra cita para hablar de estos resultados. Avíseme cuando pueda atenderme.`,
-                  `Terminé el test. Me dejó pensando... ¿Podemos agendar otra sesión pronto?`,
-                  `Ya completé todo. Tengo algunas dudas sobre lo que significa. ¿Podemos hablar en otra sesión?`,
-                ];
-                const sessionRequest = sessionRequestMessages[Math.floor(Math.random() * sessionRequestMessages.length)];
-
-                const requestMessage: Message = {
-                  id: generateId(),
-                  text: sessionRequest,
-                  sender: 'patient',
-                  timestamp: new Date(),
-                  type: 'text',
-                };
-                addMessage(currentCase!.id, requestMessage);
-
-                // Actualizar unreadCount para indicar mensaje nuevo
-                dispatch({
-                  type: 'UPDATE_CASE',
-                  payload: {
-                    id: currentCase!.id,
-                    updates: { unreadCount: 1 },
-                  },
-                });
-              }, 2000);
-            }, waitTime);
-
-            setShowTestsModal(false);
-          },
-        },
-      ]
-    );
-  };
 
   // Renderizar mensaje
   const renderMessage = ({ item }: { item: Message }) => {
@@ -820,20 +791,22 @@ const ChatScreen: React.FC = () => {
         </View>
 
         {/* Resultados de tests */}
-        {currentCase?.batteryResults && (
+        {currentCase?.testsResults && currentCase.testsResults.length > 0 && (
           <View style={styles.panelSection}>
             <Text style={styles.sectionTitle}>
-              <Icon name="clipboard" size={14} color="#9C27B0" /> Último test
+              <Icon name="clipboard" size={14} color="#9C27B0" /> Tests aplicados ({currentCase.testsResults.length}/2)
             </Text>
-            <View style={styles.testResult}>
-              <Text style={styles.testName}>{currentCase.batteryResults.testName}</Text>
-              <Text style={styles.testScore}>
-                Puntuación: {currentCase.batteryResults.score}/100
-              </Text>
-              <Text style={styles.testInterpretation}>
-                {currentCase.batteryResults.interpretation}
-              </Text>
-            </View>
+            {currentCase.testsResults.map((result, index) => (
+              <View key={index} style={styles.testResult}>
+                <Text style={styles.testName}>{result.testName}</Text>
+                <Text style={styles.testScore}>
+                  Puntuación: {result.score}/100
+                </Text>
+                <Text style={styles.testInterpretation}>
+                  {result.interpretation}
+                </Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -917,8 +890,11 @@ const ChatScreen: React.FC = () => {
                         text: 'Sí, derivar',
                         style: 'destructive',
                         onPress: () => {
-                          // Enviar mensaje de disculpa/derivación
-                          const cancellationMsg = getCancellationMessage(currentCase.patient.name);
+                          // Enviar mensaje de disculpa/derivación con contexto
+                          const sessionCount = currentCase.sessions || 0;
+                          // Por ahora usamos el perfil del usuario actual (DEV por defecto)
+                          const therapistGender = state.user.profile?.gender || 'masculine';
+                          const cancellationMsg = getCancellationMessage(currentCase.patient.name, sessionCount, currentCase.patient.gender, therapistGender);
                           const farewell: Message = {
                             id: generateId(),
                             text: cancellationMsg,
@@ -936,11 +912,18 @@ const ChatScreen: React.FC = () => {
                             clearTimeout(testNotificationTimeoutRef.current);
                           }
 
-                          // Cancelar caso después de un breve delay
-                          setTimeout(() => {
-                            dispatch({ type: 'CANCEL_CASE', payload: currentCase.id });
-                            navigation.goBack();
-                          }, 500);
+                          // Mostrar confirmación y luego cancelar (tiempo suficiente para leer)
+                          Alert.alert(
+                            'Caso Derivado',
+                            'El mensaje de derivación ha sido enviado al paciente.',
+                            [{
+                              text: 'Aceptar',
+                              onPress: () => {
+                                dispatch({ type: 'CANCEL_CASE', payload: currentCase.id });
+                                navigation.goBack();
+                              }
+                            }]
+                          );
                         },
                       },
                     ]
@@ -1084,12 +1067,8 @@ const ChatScreen: React.FC = () => {
                 {tools.map((tool) => (
                   <TouchableOpacity
                     key={tool.id}
-                    style={[
-                      styles.toolItem,
-                      tool.disabled && styles.toolItemDisabled,
-                    ]}
+                    style={styles.toolItem}
                     onPress={tool.onPress}
-                    disabled={tool.disabled}
                   >
                     <View style={[styles.toolIcon, { backgroundColor: tool.color + '20' }]}>
                       <Icon name={tool.icon} size={24} color={tool.color} />
@@ -1099,12 +1078,9 @@ const ChatScreen: React.FC = () => {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.toolTitle, tool.disabled && styles.toolTitleDisabled]}>
+                    <Text style={styles.toolTitle}>
                       {tool.title}
                     </Text>
-                    {tool.disabled && (
-                      <Icon name="lock" size={12} color="#999" style={styles.toolLock} />
-                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1121,179 +1097,154 @@ const ChatScreen: React.FC = () => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Modal de notas */}
+        {/* Modal de notas - FLOATING con KeyboardAvoidingView */}
         <Modal
           transparent
           visible={showNotesModal}
-          animationType="slide"
-          onRequestClose={() => setShowNotesModal(false)}
+          animationType="fade"
+          onRequestClose={() => {
+            Keyboard.dismiss();
+            setShowNotesModal(false);
+          }}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.notesModal}>
-              <View style={styles.notesModalHeader}>
-                <Text style={styles.notesModalTitle}>Notas del caso</Text>
-                <TouchableOpacity onPress={() => setShowNotesModal(false)}>
-                  <Icon name="times" size={22} color="#666" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Selector de tipo */}
-              <View style={styles.noteTypeSelector}>
-                {(['general', 'symptom', 'observation'] as const).map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.noteTypeBtn,
-                      noteType === type && styles.noteTypeBtnActive,
-                    ]}
-                    onPress={() => setNoteType(type)}
-                  >
-                    <Text style={[
-                      styles.noteTypeBtnText,
-                      noteType === type && styles.noteTypeBtnTextActive,
-                    ]}>
-                      {type === 'general' ? 'General' :
-                       type === 'symptom' ? 'Síntoma' : 'Observación'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Input de nota */}
-              <View style={styles.noteInputContainer}>
-                <TextInput
-                  style={styles.noteInput}
-                  value={newNote}
-                  onChangeText={setNewNote}
-                  placeholder="Escribe tu nota..."
-                  multiline
-                  maxLength={200}
-                />
-                <TouchableOpacity
-                  style={[styles.addNoteBtn, !newNote.trim() && styles.addNoteBtnDisabled]}
-                  onPress={addNote}
-                  disabled={!newNote.trim()}
-                >
-                  <Icon name="plus" size={18} color="white" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Lista de notas */}
-              <ScrollView style={styles.notesList}>
-                {currentCase.notes && currentCase.notes.length > 0 ? (
-                  [...currentCase.notes].reverse().map((note) => (
-                    <View key={note.id} style={styles.noteListItem}>
-                      <View style={[styles.noteTypeTag, {
-                        backgroundColor: note.type === 'symptom' ? '#FF9800' :
-                                        note.type === 'observation' ? '#2196F3' : '#9E9E9E'
-                      }]}>
-                        <Text style={styles.noteTypeTagText}>
-                          {note.type === 'symptom' ? 'S' : note.type === 'observation' ? 'O' : 'G'}
-                        </Text>
-                      </View>
-                      <View style={styles.noteContent}>
-                        <Text style={styles.noteItemText}>{note.text}</Text>
-                        <Text style={styles.noteTimestamp}>
-                          {new Date(note.timestamp).toLocaleString('es-ES', {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Text>
-                      </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalCenteredContainer}
+          >
+            <TouchableOpacity
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowNotesModal(false);
+              }}
+            >
+              <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.floatingNotesCard}>
+                  {/* Header con Sparkles */}
+                  <View style={styles.floatingNotesHeader}>
+                    <View style={styles.headerTitleRow}>
+                      <Icon name="magic" size={18} color="#667eea" style={{ marginRight: 8 }} />
+                      <Text style={styles.floatingNotesTitle}>Notas del caso</Text>
                     </View>
-                  ))
-                ) : (
-                  <Text style={styles.noNotesText}>No hay notas aún</Text>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setShowNotesModal(false);
+                      }}
+                      style={styles.closeButton}
+                    >
+                      <Icon name="times" size={20} color="#666" />
+                    </TouchableOpacity>
+                  </View>
 
-        {/* Modal de tests */}
-        <Modal
-          transparent
-          visible={showTestsModal}
-          animationType="slide"
-          onRequestClose={() => setShowTestsModal(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.testsModal}>
-              <View style={styles.testsModalHeader}>
-                <Text style={styles.testsModalTitle}>Baterías de tests</Text>
-                <View style={styles.coinsDisplay}>
-                  <Icon name="circle" size={14} color="#FFD700" />
-                  <Text style={styles.coinsText}>{state.user.coins}</Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowTestsModal(false)}>
-                  <Icon name="times" size={22} color="#666" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.testsList}>
-                <Text style={styles.testCategory}>Screening (5 monedas)</Text>
-                {getAvailableTests().filter((t: PsychTest) => t.category === 'screening').map((test: PsychTest) => (
-                  <TouchableOpacity
-                    key={test.id}
-                    style={styles.testItem}
-                    onPress={() => applyTest(test)}
-                  >
-                    <View style={styles.testInfo}>
-                      <Text style={styles.testItemName}>{test.name}</Text>
-                      <Text style={styles.testDescription}>{test.evaluates}</Text>
-                    </View>
-                    <View style={styles.testCost}>
-                      <Icon name="circle" size={12} color="#FFD700" />
-                      <Text style={styles.testCostText}>{test.cost}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-                <Text style={styles.testCategory}>Diferencial (10-15 monedas)</Text>
-                {getAvailableTests().filter((t: PsychTest) => t.category === 'diferencial').map((test: PsychTest) => (
-                  <TouchableOpacity
-                    key={test.id}
-                    style={styles.testItem}
-                    onPress={() => applyTest(test)}
-                  >
-                    <View style={styles.testInfo}>
-                      <Text style={styles.testItemName}>{test.name}</Text>
-                      <Text style={styles.testDescription}>{test.evaluates}</Text>
-                    </View>
-                    <View style={styles.testCost}>
-                      <Icon name="circle" size={12} color="#FFD700" />
-                      <Text style={styles.testCostText}>{test.cost}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-                {getAvailableTests().filter((t: PsychTest) => t.category === 'personalidad').length > 0 && (
-                  <>
-                    <Text style={styles.testCategory}>Personalidad (25 monedas)</Text>
-                    {getAvailableTests().filter((t: PsychTest) => t.category === 'personalidad').map((test: PsychTest) => (
+                  {/* Selector de tipo con gradient */}
+                  <View style={styles.noteTypeSelector}>
+                    {(['general', 'symptom', 'observation'] as const).map((type) => (
                       <TouchableOpacity
-                        key={test.id}
-                        style={styles.testItem}
-                        onPress={() => applyTest(test)}
+                        key={type}
+                        style={[
+                          styles.floatingNoteTypeBtn,
+                          noteType === type && styles.floatingNoteTypeBtnActive,
+                        ]}
+                        onPress={() => setNoteType(type)}
                       >
-                        <View style={styles.testInfo}>
-                          <Text style={styles.testItemName}>{test.name}</Text>
-                          <Text style={styles.testDescription}>{test.evaluates}</Text>
-                        </View>
-                        <View style={styles.testCost}>
-                          <Icon name="circle" size={12} color="#FFD700" />
-                          <Text style={styles.testCostText}>{test.cost}</Text>
-                        </View>
+                        {noteType === type ? (
+                          <LinearGradient
+                            colors={['#667eea', '#764ba2']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.gradientButton}
+                          >
+                            <Text style={styles.floatingNoteTypeBtnTextActive}>
+                              {type === 'general' ? '📝 General' :
+                               type === 'symptom' ? '⚠️ Síntoma' : '👁️ Observación'}
+                            </Text>
+                          </LinearGradient>
+                        ) : (
+                          <Text style={styles.floatingNoteTypeBtnText}>
+                            {type === 'general' ? '📝 General' :
+                             type === 'symptom' ? '⚠️ Síntoma' : '👁️ Observación'}
+                          </Text>
+                        )}
                       </TouchableOpacity>
                     ))}
-                  </>
-                )}
-              </ScrollView>
-            </View>
-          </View>
+                  </View>
+
+                  {/* Input de nota con gradient border */}
+                  <View style={styles.floatingNoteInputContainer}>
+                    <TextInput
+                      style={styles.floatingNoteInput}
+                      value={newNote}
+                      onChangeText={setNewNote}
+                      placeholder="Escribe tu nota aquí..."
+                      placeholderTextColor="#999"
+                      multiline
+                      maxLength={200}
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  {/* Botón agregar con gradient */}
+                  <TouchableOpacity
+                    style={[
+                      styles.floatingAddNoteBtn,
+                      !newNote.trim() && styles.floatingAddNoteBtnDisabled,
+                    ]}
+                    onPress={addNote}
+                    disabled={!newNote.trim()}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={!newNote.trim() ? ['#B0BEC5', '#B0BEC5'] : ['#667eea', '#764ba2']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.gradientAddButton}
+                    >
+                      <Icon name="plus" size={16} color="white" style={{ marginRight: 8 }} />
+                      <Text style={styles.floatingAddNoteBtnText}>Agregar nota</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Lista de notas */}
+                  <ScrollView style={styles.floatingNotesList} showsVerticalScrollIndicator={false}>
+                    {currentCase.notes && currentCase.notes.length > 0 ? (
+                      [...currentCase.notes].reverse().map((note) => (
+                        <View key={note.id} style={styles.floatingNoteListItem}>
+                          <View style={[styles.floatingNoteTypeTag, {
+                            backgroundColor: note.type === 'symptom' ? '#FF9800' :
+                                            note.type === 'observation' ? '#2196F3' : '#9E9E9E'
+                          }]}>
+                            <Text style={styles.floatingNoteTypeTagText}>
+                              {note.type === 'symptom' ? '⚠️' : note.type === 'observation' ? '👁️' : '📝'}
+                            </Text>
+                          </View>
+                          <View style={styles.floatingNoteContent}>
+                            <Text style={styles.floatingNoteItemText}>{note.text}</Text>
+                            <Text style={styles.floatingNoteTimestamp}>
+                              {new Date(note.timestamp).toLocaleString('es-ES', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </Text>
+                          </View>
+                        </View>
+                      ))
+                    ) : (
+                      <View style={styles.emptyNotesContainer}>
+                        <Icon name="magic" size={20} color="#9C27B0" style={{ marginBottom: 8 }} />
+                        <Text style={styles.emptyNotesText}>Aún no tienes notas</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </Modal>
+
       </LinearGradient>
     </View>
   );
@@ -1996,6 +1947,166 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F57C00',
     marginLeft: 4,
+  },
+  // Floating Notes Modal Styles
+  modalCenteredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  floatingNotesCard: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+    maxHeight: SCREEN_HEIGHT * 0.7,
+  },
+  floatingNotesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  floatingNotesTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  floatingNoteTypeBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: '#F5F5F5',
+    overflow: 'hidden',
+  },
+  floatingNoteTypeBtnActive: {
+    backgroundColor: 'transparent',
+  },
+  gradientButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingNoteTypeBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  floatingNoteTypeBtnTextActive: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'white',
+  },
+  floatingNoteInputContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
+  floatingNoteInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 15,
+    padding: 15,
+    fontSize: 14,
+    color: '#333',
+    minHeight: 100,
+    maxHeight: 150,
+    textAlignVertical: 'top',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  floatingAddNoteBtn: {
+    marginHorizontal: 20,
+    marginBottom: 15,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  floatingAddNoteBtnDisabled: {
+    opacity: 0.5,
+  },
+  gradientAddButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderRadius: 15,
+  },
+  floatingAddNoteBtnText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  floatingNotesList: {
+    paddingHorizontal: 20,
+    maxHeight: 200,
+  },
+  floatingNoteListItem: {
+    flexDirection: 'row',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  floatingNoteTypeTag: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  floatingNoteTypeTagText: {
+    fontSize: 16,
+  },
+  floatingNoteContent: {
+    flex: 1,
+  },
+  floatingNoteItemText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  floatingNoteTimestamp: {
+    fontSize: 11,
+    color: '#999',
+  },
+  emptyNotesContainer: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  emptyNotesText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 

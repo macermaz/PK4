@@ -45,9 +45,15 @@ export const generateRandomPatient = (seed: number) => {
   const lastNameIndex = Math.floor(rng(seed + 1) * patientNames.lastNames.length);
   const occupationIndex = Math.floor(rng(seed + 2) * patientNames.occupations.length);
   const age = Math.floor(rng(seed + 3) * 45) + 18; // 18-63 años
+  const fullName = `${patientNames.firstNames[firstNameIndex]} ${patientNames.lastNames[lastNameIndex]}`;
+
+  // Detectar género por nombre
+  const { detectPatientGender } = require('../utils/genderUtils');
+  const gender = detectPatientGender(fullName);
 
   return {
-    name: `${patientNames.firstNames[firstNameIndex]} ${patientNames.lastNames[lastNameIndex]}`,
+    name: fullName,
+    gender,
     age,
     occupation: patientNames.occupations[occupationIndex],
     avatar: patientNames.firstNames[firstNameIndex].substring(0, 2).toUpperCase(),
@@ -1551,6 +1557,141 @@ export const treatments: Record<string, Treatment> = {
     techniques: ['Monitoreo de actividades', 'Programación de actividades', 'Resolución de problemas', 'Reducción de evitación'],
     targetDisorders: ['trastorno_depresivo_mayor', 'distimia'],
   },
+
+  // Trastornos de Personalidad (Guías NICE)
+  tcc_personalidad_evitativa: {
+    id: 'tcc_personalidad_evitativa',
+    name: 'TCC para Trastorno Evitativo',
+    type: 'primera_linea',
+    description: 'Exposición gradual social + reestructuración de creencias sobre rechazo.',
+    effectiveness: 'Moderada-Alta',
+    duration: '20-40 sesiones',
+    techniques: ['Exposición social gradual', 'Desafío de creencias nucleares', 'Entrenamiento en habilidades sociales', 'Manejo de ansiedad anticipatoria'],
+    targetDisorders: ['trastorno_evitativo'],
+  },
+
+  terapia_esquemas: {
+    id: 'terapia_esquemas',
+    name: 'Terapia de Esquemas',
+    type: 'primera_linea',
+    description: 'Identificación y modificación de patrones vitales desadaptativos.',
+    effectiveness: 'Alta para trastornos de personalidad',
+    duration: '1-2 años',
+    techniques: ['Identificación de esquemas', 'Trabajo con modos', 'Reparentalización limitada', 'Confrontación empática'],
+    targetDisorders: ['trastorno_limite_personalidad', 'trastorno_evitativo', 'trastorno_obsesivo_personalidad', 'trastorno_narcisista_personalidad'],
+  },
+
+  tcc_personalidad_obsesiva: {
+    id: 'tcc_personalidad_obsesiva',
+    name: 'TCC para Trastorno Obsesivo de Personalidad',
+    type: 'primera_linea',
+    description: 'Flexibilización cognitiva y conductual del perfeccionismo rígido.',
+    effectiveness: 'Moderada',
+    duration: '16-30 sesiones',
+    techniques: ['Experimentos conductuales con imperfección', 'Evaluación de costes del perfeccionismo', 'Técnicas de flexibilización', 'Manejo de ansiedad'],
+    targetDisorders: ['trastorno_obsesivo_personalidad'],
+  },
+
+  // Tratamientos de Segunda Línea (cuando primera línea falla o hay contraindicaciones)
+  tcc_focalizada_trauma: {
+    id: 'tcc_focalizada_trauma',
+    name: 'TCC Focalizada en el Trauma',
+    type: 'segunda_linea',
+    description: 'Exposición prolongada a memorias traumáticas + reestructuración cognitiva.',
+    effectiveness: 'Alta',
+    duration: '8-15 sesiones',
+    techniques: ['Exposición prolongada imaginada', 'Exposición in vivo', 'Reestructuración de significados', 'Procesamiento emocional'],
+    targetDisorders: ['trastorno_estres_postraumatico', 'tept_complejo'],
+  },
+
+  farmacoterapia_adjunta: {
+    id: 'farmacoterapia_adjunta',
+    name: 'Coordinación con Psiquiatría',
+    type: 'adjunto',
+    description: 'Derivación a psiquiatría para valoración farmacológica complementaria.',
+    effectiveness: 'Variable según trastorno',
+    duration: 'Continuo',
+    techniques: ['Evaluación de indicación farmacológica', 'Coordinación con psiquiatría', 'Seguimiento de adherencia', 'Manejo de efectos secundarios'],
+    targetDisorders: ['trastorno_depresivo_mayor', 'trastorno_bipolar_i', 'trastorno_bipolar_ii', 'trastorno_obsesivo_compulsivo', 'trastorno_panico', 'trastorno_ansiedad_generalizada'],
+  },
+
+  terapia_familiar: {
+    id: 'terapia_familiar',
+    name: 'Terapia Familiar',
+    type: 'adjunto',
+    description: 'Abordaje de dinámicas familiares que mantienen el problema.',
+    effectiveness: 'Alta en TCA y adicciones',
+    duration: '10-20 sesiones familiares',
+    techniques: ['Análisis de patrones familiares', 'Reestructuración de comunicación', 'Psicoeducación familiar', 'Resolución de conflictos'],
+    targetDisorders: ['anorexia_nerviosa', 'bulimia_nerviosa', 'trastorno_consumo_alcohol', 'trastorno_consumo_sustancias', 'trastorno_limite_personalidad'],
+  },
+
+  terapia_grupal_apoyo: {
+    id: 'terapia_grupal_apoyo',
+    name: 'Terapia Grupal de Apoyo',
+    type: 'adjunto',
+    description: 'Grupo de apoyo entre iguales con facilitación profesional.',
+    effectiveness: 'Moderada (complementaria)',
+    duration: 'Continuado',
+    techniques: ['Compartir experiencias', 'Apoyo mutuo', 'Normalización', 'Modelado social'],
+    targetDisorders: ['trastorno_consumo_alcohol', 'trastorno_consumo_sustancias', 'trastorno_atracon', 'trastorno_depresivo_mayor'],
+  },
+
+  // Intervenciones específicas adicionales
+  terapia_exposicion_realidad_virtual: {
+    id: 'terapia_exposicion_realidad_virtual',
+    name: 'Terapia de Exposición con Realidad Virtual',
+    type: 'segunda_linea',
+    description: 'Exposición a situaciones fóbicas mediante entornos virtuales controlados.',
+    effectiveness: 'Alta (comparable a exposición in vivo)',
+    duration: '8-12 sesiones',
+    techniques: ['Exposición VR gradual', 'Habituación en entorno seguro', 'Generalización al mundo real', 'Prevención de evitación'],
+    targetDisorders: ['agorafobia', 'fobia_social', 'trastorno_panico', 'trastorno_estres_postraumatico'],
+  },
+
+  intervencion_crisis: {
+    id: 'intervencion_crisis',
+    name: 'Intervención en Crisis',
+    type: 'primera_linea',
+    description: 'Estabilización inmediata y plan de seguridad.',
+    effectiveness: 'Alta para estabilización aguda',
+    duration: '1-6 sesiones',
+    techniques: ['Evaluación de riesgo suicida', 'Plan de seguridad', 'Contención emocional', 'Movilización de recursos'],
+    targetDisorders: ['trastorno_adaptativo', 'trastorno_estres_agudo', 'trastorno_limite_personalidad'],
+  },
+
+  terapia_narrativa: {
+    id: 'terapia_narrativa',
+    name: 'Terapia Narrativa',
+    type: 'segunda_linea',
+    description: 'Reconstrucción de la narrativa personal post-trauma.',
+    effectiveness: 'Moderada-Alta',
+    duration: '12-20 sesiones',
+    techniques: ['Externalización del problema', 'Reconstrucción de la historia', 'Identificación de fortalezas', 'Audiencia externa'],
+    targetDisorders: ['trastorno_estres_postraumatico', 'tept_complejo', 'trastorno_adaptativo'],
+  },
+
+  mindfulness_reduccion_estres: {
+    id: 'mindfulness_reduccion_estres',
+    name: 'MBSR (Reducción de Estrés Basada en Mindfulness)',
+    type: 'segunda_linea',
+    description: 'Programa estructurado de 8 semanas de práctica de mindfulness.',
+    effectiveness: 'Moderada-Alta',
+    duration: '8 sesiones grupales',
+    techniques: ['Meditación sentada', 'Body scan', 'Yoga mindful', 'Práctica informal'],
+    targetDisorders: ['trastorno_ansiedad_generalizada', 'trastorno_adaptativo', 'trastorno_depresivo_mayor'],
+  },
+
+  terapia_resolucion_problemas: {
+    id: 'terapia_resolucion_problemas',
+    name: 'Terapia de Resolución de Problemas',
+    type: 'primera_linea',
+    description: 'Entrenamiento sistemático en habilidades de resolución de problemas.',
+    effectiveness: 'Moderada-Alta',
+    duration: '6-12 sesiones',
+    techniques: ['Definición del problema', 'Generación de alternativas', 'Toma de decisiones', 'Implementación y evaluación'],
+    targetDisorders: ['trastorno_depresivo_mayor', 'trastorno_adaptativo', 'trastorno_ansiedad_generalizada'],
+  },
 };
 
 // Función para obtener tratamientos por diagnóstico
@@ -1568,9 +1709,622 @@ export const getAllTreatments = (): Treatment[] => {
   return Object.values(treatments);
 };
 
-// Función para verificar si un tratamiento es correcto para un trastorno
-export const isTreatmentCorrectForDisorder = (treatmentId: string, disorderId: string): boolean => {
+// Función para verificar si un tratamiento es correcto para un trastorno (MEJORADA)
+export const isTreatmentCorrectForDisorder = (treatmentId: string, disorderId: string, attemptNumber: number = 1): boolean => {
   const treatment = treatments[treatmentId as keyof typeof treatments];
   if (!treatment) return false;
-  return treatment.targetDisorders.includes(disorderId) && treatment.type === 'primera_linea';
+
+  // Verificar que el tratamiento esté indicado para este trastorno
+  if (!treatment.targetDisorders.includes(disorderId)) {
+    return false;
+  }
+
+  // En el primer intento, aceptar primera línea Y adjuntos (más flexible y realista)
+  // Los tratamientos adjuntos como coordinación con psiquiatría son válidos
+  if (attemptNumber === 1) {
+    return treatment.type === 'primera_linea' || treatment.type === 'adjunto';
+  }
+
+  // En el segundo intento (después de fallar), aceptar cualquier tratamiento válido
+  // incluyendo segunda línea (es realista que se pruebe algo diferente)
+  return true;
+};
+
+// Función auxiliar para obtener tratamientos recomendados por prioridad
+export const getRecommendedTreatments = (disorderId: string): { firstLine: Treatment[], secondLine: Treatment[], adjunct: Treatment[] } => {
+  const allTreatments = getTreatmentsByDisorder(disorderId);
+
+  return {
+    firstLine: allTreatments.filter(t => t.type === 'primera_linea'),
+    secondLine: allTreatments.filter(t => t.type === 'segunda_linea'),
+    adjunct: allTreatments.filter(t => t.type === 'adjunto'),
+  };
+};
+
+// ============================================================================
+// COMISIONES INTERUNIVERSALES (CASOS RAROS/ESPECIALES)
+// ============================================================================
+
+export interface Commission {
+  id: string;
+  name: string;
+  acronym: string;
+  description: string;
+  specialty: string;
+  caseTypes: string[];
+  rarity: 'uncommon' | 'rare' | 'very_rare' | 'legendary';
+  probability: number; // % de probabilidad de aparecer
+}
+
+export const commissions: Record<string, Commission> = {
+  cat: {
+    id: 'cat',
+    name: 'Comisión de Atención Temporal',
+    acronym: 'C.A.T.',
+    description: 'Casos que requieren intervención inmediata por crisis temporal.',
+    specialty: 'Crisis y emergencias psicológicas',
+    caseTypes: ['crisis_panico', 'duelo_agudo', 'ideacion_suicida', 'crisis_ansiedad'],
+    rarity: 'uncommon',
+    probability: 15,
+  },
+  caup: {
+    id: 'caup',
+    name: 'Comisión de Ayuda Universal Paralela',
+    acronym: 'C.A.U.P.',
+    description: 'Casos de poblaciones vulnerables y situaciones socioeconómicas complejas.',
+    specialty: 'Psicología social y comunitaria',
+    caseTypes: ['duelo_migratorio', 'pobreza_extrema', 'violencia_domestica', 'exclusion_social'],
+    rarity: 'rare',
+    probability: 10,
+  },
+  arca: {
+    id: 'arca',
+    name: 'Agencia de Rescate de Casos Atípicos',
+    acronym: 'A.R.C.A.',
+    description: 'Casos inusuales, raros o con presentaciones atípicas de trastornos.',
+    specialty: 'Casos complejos y diagnóstico diferencial difícil',
+    caseTypes: ['somatizacion_extrema', 'trastorno_facticio', 'conversion', 'disociativo'],
+    rarity: 'very_rare',
+    probability: 5,
+  },
+  portal_psi: {
+    id: 'portal_psi',
+    name: 'Portal Psi',
+    acronym: 'Portal Ψ',
+    description: 'Red de derivación para casos de alta complejidad clínica.',
+    specialty: 'Comorbilidad y casos refractarios',
+    caseTypes: ['comorbilidad_triple', 'resistencia_tratamiento', 'personalidad_compleja'],
+    rarity: 'very_rare',
+    probability: 5,
+  },
+  archivo_omega: {
+    id: 'archivo_omega',
+    name: 'Archivo Omega',
+    acronym: 'Archivo Ω',
+    description: 'Repositorio de casos históricos reabiertos para segunda opinión.',
+    specialty: 'Revisión de casos y errores diagnósticos',
+    caseTypes: ['diagnostico_erroneo_previo', 'iatrogenia', 'caso_cronico'],
+    rarity: 'legendary',
+    probability: 2,
+  },
+  nexus: {
+    id: 'nexus',
+    name: 'NEXUS - Red de Excelencia en Salud Mental',
+    acronym: 'NEXUS',
+    description: 'Casos de investigación y formación avanzada.',
+    specialty: 'Investigación clínica y casos docentes',
+    caseTypes: ['caso_docente', 'investigacion', 'protocolo_experimental'],
+    rarity: 'legendary',
+    probability: 2,
+  },
+};
+
+// Función para obtener una comisión aleatoria según probabilidad
+export const getRandomCommission = (): Commission | null => {
+  const roll = Math.random() * 100;
+  let cumulative = 0;
+
+  // Ordenar por probabilidad descendente
+  const sortedCommissions = Object.values(commissions).sort((a, b) => b.probability - a.probability);
+
+  for (const commission of sortedCommissions) {
+    cumulative += commission.probability;
+    if (roll < cumulative) {
+      return commission;
+    }
+  }
+
+  return null; // No se activó ninguna comisión (caso normal de PSYKAT)
+};
+
+// ============================================================================
+// CASOS RAROS Y ESPECIALES
+// ============================================================================
+
+export interface RareCase {
+  id: string;
+  name: string;
+  description: string;
+  symptoms: string[];
+  differentialDiagnosis: string[];
+  correctDiagnosis: string;
+  difficulty: 'dificil' | 'realista';
+  commission?: string;
+  backstoryTemplate: string;
+  specialInstructions: string;
+}
+
+export const rareCases: Record<string, RareCase> = {
+  // Casos de somatización
+  somatizacion_cardiaca: {
+    id: 'somatizacion_cardiaca',
+    name: 'Somatización Cardíaca',
+    description: 'Paciente convencido de tener problemas cardíacos sin causa orgánica.',
+    symptoms: ['dolor_pecho', 'palpitaciones', 'miedo_muerte', 'visitas_urgencias'],
+    differentialDiagnosis: ['trastorno_panico', 'trastorno_ansiedad_generalizada', 'hipocondria'],
+    correctDiagnosis: 'trastorno_panico',
+    difficulty: 'dificil',
+    commission: 'cat',
+    backstoryTemplate: 'Lleva meses visitando cardiólogos. Todas las pruebas salen bien pero {name} está convencido/a de que algo grave le pasa al corazón. Ha ido a urgencias {random:3,8} veces en los últimos meses.',
+    specialInstructions: 'Insiste en que es un problema físico. Muy resistente a explicaciones psicológicas.',
+  },
+
+  duelo_complicado: {
+    id: 'duelo_complicado',
+    name: 'Duelo Complicado',
+    description: 'Duelo que no avanza, con elementos de culpa y negación.',
+    symptoms: ['tristeza_profunda', 'culpa', 'negacion', 'aislamiento', 'idealizacion'],
+    differentialDiagnosis: ['trastorno_depresivo_mayor', 'trastorno_adaptativo', 'duelo_normal'],
+    correctDiagnosis: 'trastorno_adaptativo',
+    difficulty: 'dificil',
+    commission: 'cat',
+    backstoryTemplate: 'Perdió a {random:padre,madre,pareja,hijo/a} hace {random:6,18} meses. Sigue hablando en presente de la persona, no ha tocado sus cosas, y siente que si "avanza" es traición.',
+    specialInstructions: 'Evita usar la palabra "muerte" o "murió". Cambia de tema cuando se acerca.',
+  },
+
+  trastorno_facticio: {
+    id: 'trastorno_facticio',
+    name: 'Trastorno Facticio',
+    description: 'Paciente que simula o provoca síntomas para asumir rol de enfermo.',
+    symptoms: ['sintomas_inconsistentes', 'conocimiento_medico_inusual', 'historial_hospitalizaciones'],
+    differentialDiagnosis: ['hipocondria', 'trastorno_somatomorfo', 'simulacion'],
+    correctDiagnosis: 'trastorno_facticio', // No está en la lista principal, caso especial
+    difficulty: 'realista',
+    commission: 'arca',
+    backstoryTemplate: '{name} tiene un extenso historial médico. Ha visitado decenas de especialistas y ha sido operado/a varias veces por "problemas" que nunca se confirman. Trabaja o trabajó en el sector sanitario.',
+    specialInstructions: 'Los síntomas no encajan del todo. Conoce mucha terminología médica. Se contradice sutilmente.',
+  },
+
+  conversion_motora: {
+    id: 'conversion_motora',
+    name: 'Trastorno de Conversión',
+    description: 'Síntomas neurológicos sin causa orgánica (parálisis, ceguera, etc).',
+    symptoms: ['paralisis_funcional', 'temblores', 'ceguera_funcional', 'indiferencia_sintomas'],
+    differentialDiagnosis: ['enfermedad_neurologica', 'simulacion', 'trastorno_somatomorfo'],
+    correctDiagnosis: 'trastorno_conversion', // Caso especial
+    difficulty: 'realista',
+    commission: 'arca',
+    backstoryTemplate: 'Apareció de repente: {random:no puede mover la mano,perdió la voz,tiene temblores incontrolables}. Los neurólogos dicen que "no hay nada" pero el síntoma es real. Curiosamente, {name} parece tranquilo/a al respecto.',
+    specialInstructions: 'Muestra "la belle indifférence" - no parece muy preocupado/a por síntomas graves. Hubo un estresor reciente que evita mencionar.',
+  },
+
+  disociativo_identidad: {
+    id: 'disociativo_identidad',
+    name: 'Trastorno Disociativo',
+    description: 'Amnesia disociativa o síntomas de despersonalización severos.',
+    symptoms: ['lagunas_memoria', 'despersonalizacion', 'desrealizacion', 'trauma_severo'],
+    differentialDiagnosis: ['tept_complejo', 'trastorno_limite_personalidad', 'epilepsia'],
+    correctDiagnosis: 'tept_complejo',
+    difficulty: 'realista',
+    commission: 'arca',
+    backstoryTemplate: 'Tiene "lagunas" de memoria. A veces "despierta" en lugares sin saber cómo llegó. Siente que se mira desde fuera. Hay un pasado traumático que apenas recuerda.',
+    specialInstructions: 'Se desconecta durante la sesión. Puede parecer "ausente" por momentos. Evita sistemáticamente hablar de la infancia.',
+  },
+
+  comorbilidad_ansiedad_depresion: {
+    id: 'comorbilidad_ansiedad_depresion',
+    name: 'Comorbilidad Ansiedad-Depresión',
+    description: 'Caso donde coexisten TAG y TDM, dificultando el diagnóstico principal.',
+    symptoms: ['tristeza', 'preocupacion_excesiva', 'fatiga', 'insomnio', 'anhedonia', 'irritabilidad'],
+    differentialDiagnosis: ['trastorno_depresivo_mayor', 'trastorno_ansiedad_generalizada', 'trastorno_mixto'],
+    correctDiagnosis: 'trastorno_depresivo_mayor', // El primario suele ser el que más incapacita
+    difficulty: 'dificil',
+    commission: 'portal_psi',
+    backstoryTemplate: '{name} no sabe si está triste o nervioso/a. "Es todo a la vez". No duerme bien, no disfruta nada, y está constantemente preocupado/a por todo. Ha empeorado en los últimos {random:4,8} meses.',
+    specialInstructions: 'Los síntomas se solapan. Hay que identificar cuál empezó primero o cuál incapacita más.',
+  },
+
+  trastorno_panico_agorafobia: {
+    id: 'trastorno_panico_agorafobia',
+    name: 'Pánico con Agorafobia Severa',
+    description: 'Trastorno de pánico que ha evolucionado a agorafobia incapacitante.',
+    symptoms: ['ataques_panico', 'evitacion_extrema', 'dependencia', 'aislamiento_total'],
+    differentialDiagnosis: ['trastorno_panico', 'agorafobia', 'fobia_social'],
+    correctDiagnosis: 'agorafobia',
+    difficulty: 'dificil',
+    commission: 'cat',
+    backstoryTemplate: 'Empezó con ataques de pánico hace {random:1,3} años. Ahora {name} apenas sale de casa. Necesita que alguien le acompañe a todas partes. Ha dejado de trabajar.',
+    specialInstructions: 'Describe con detalle el "mapa" de lugares que evita. La sesión en sí puede generarle ansiedad.',
+  },
+
+  bipolar_no_diagnosticado: {
+    id: 'bipolar_no_diagnosticado',
+    name: 'Bipolar II No Diagnosticado',
+    description: 'Paciente tratado por depresión recurrente que en realidad tiene bipolar II.',
+    symptoms: ['depresion_recurrente', 'episodios_energia_alta', 'irritabilidad', 'insomnio_sin_cansancio'],
+    differentialDiagnosis: ['trastorno_depresivo_mayor', 'trastorno_bipolar_ii', 'ciclotimia'],
+    correctDiagnosis: 'trastorno_bipolar_ii',
+    difficulty: 'realista',
+    commission: 'archivo_omega',
+    backstoryTemplate: 'Ha sido diagnosticado/a de depresión {random:2,4} veces. Los antidepresivos "funcionan al principio" pero luego se siente "raro/a, acelerado/a". Nadie ha preguntado por épocas de mucha energía.',
+    specialInstructions: 'Hay que indagar específicamente sobre episodios de energía alta, poco sueño sin cansancio, gastos impulsivos. El paciente no los considera "problema".',
+  },
+
+  tept_infancia: {
+    id: 'tept_infancia',
+    name: 'TEPT por Trauma Infantil',
+    description: 'TEPT complejo por abuso en la infancia, presenta como depresión/ansiedad.',
+    symptoms: ['flashbacks', 'pesadillas', 'evitacion', 'desconfianza', 'autoestima_baja'],
+    differentialDiagnosis: ['trastorno_depresivo_mayor', 'trastorno_limite_personalidad', 'tept_complejo'],
+    correctDiagnosis: 'tept_complejo',
+    difficulty: 'realista',
+    commission: 'archivo_omega',
+    backstoryTemplate: '{name} ha pasado por varios terapeutas. Le diagnosticaron depresión, ansiedad, "problemas de personalidad". Nadie ha explorado bien la infancia. Dice que fue "normal" pero hay lagunas.',
+    specialInstructions: 'Resiste hablar de la infancia. Usa frases como "no me acuerdo bien" o "era normal, supongo". El trauma está enterrado.',
+  },
+
+  tca_oculto: {
+    id: 'tca_oculto',
+    name: 'TCA Enmascarado',
+    description: 'Trastorno alimentario que el paciente niega u oculta activamente.',
+    symptoms: ['control_alimentacion', 'rituales_comida', 'ejercicio_excesivo', 'distorsion_corporal'],
+    differentialDiagnosis: ['trastorno_ansiedad_generalizada', 'toc', 'anorexia_nerviosa'],
+    correctDiagnosis: 'anorexia_nerviosa',
+    difficulty: 'realista',
+    commission: 'arca',
+    backstoryTemplate: '{name} viene por "ansiedad" o "estrés". Está delgado/a pero dice que come bien. Hace ejercicio "normal" (2-3 horas diarias). Evita comer con otros. Conoce las calorías de todo.',
+    specialInstructions: 'Niega el TCA activamente. Racionaliza todo como "vida sana". Solo con mucho rapport admitirá la obsesión con el control.',
+  },
+};
+
+// Función para obtener un caso raro aleatorio
+export const getRandomRareCase = (difficulty: 'dificil' | 'realista'): RareCase | null => {
+  const availableCases = Object.values(rareCases).filter(c => c.difficulty === difficulty);
+  if (availableCases.length === 0) return null;
+
+  // 20% de probabilidad de caso raro en difícil, 35% en realista
+  const probability = difficulty === 'realista' ? 0.35 : 0.20;
+  if (Math.random() > probability) return null;
+
+  return availableCases[Math.floor(Math.random() * availableCases.length)];
+};
+
+// ============================================================================
+// COMORBILIDADES COMUNES
+// ============================================================================
+
+export interface Comorbidity {
+  primary: string;
+  secondary: string[];
+  probability: number; // 0-100
+  clinicalNotes: string;
+}
+
+export const comorbidities: Comorbidity[] = [
+  {
+    primary: 'trastorno_depresivo_mayor',
+    secondary: ['trastorno_ansiedad_generalizada', 'trastorno_panico', 'fobia_social'],
+    probability: 60,
+    clinicalNotes: 'La depresión y ansiedad coexisten en >50% de casos. Identificar cuál es primaria.',
+  },
+  {
+    primary: 'trastorno_ansiedad_generalizada',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_panico', 'insomnio'],
+    probability: 55,
+    clinicalNotes: 'TAG raramente se presenta solo. Buscar síntomas depresivos subyacentes.',
+  },
+  {
+    primary: 'trastorno_panico',
+    secondary: ['agorafobia', 'trastorno_ansiedad_generalizada', 'depresion'],
+    probability: 70,
+    clinicalNotes: 'Pánico evoluciona frecuentemente a agorafobia. Prevención importante.',
+  },
+  {
+    primary: 'trastorno_estres_postraumatico',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_consumo_sustancias', 'trastorno_panico'],
+    probability: 80,
+    clinicalNotes: 'TEPT muy raramente aislado. Explorar automedicación con sustancias.',
+  },
+  {
+    primary: 'trastorno_limite_personalidad',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_consumo_sustancias', 'trastorno_alimentario'],
+    probability: 85,
+    clinicalNotes: 'TLP casi siempre con comorbilidad. Tratar primero la más incapacitante.',
+  },
+  {
+    primary: 'trastorno_obsesivo_compulsivo',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_ansiedad_generalizada'],
+    probability: 65,
+    clinicalNotes: 'Depresión secundaria al TOC es muy común por el sufrimiento.',
+  },
+  {
+    primary: 'anorexia_nerviosa',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_obsesivo_compulsivo', 'trastorno_ansiedad_generalizada'],
+    probability: 70,
+    clinicalNotes: 'TCA frecuentemente con rasgos obsesivos y depresión.',
+  },
+  {
+    primary: 'trastorno_consumo_alcohol',
+    secondary: ['trastorno_depresivo_mayor', 'trastorno_ansiedad_generalizada', 'trastorno_personalidad'],
+    probability: 75,
+    clinicalNotes: 'Evaluar si el consumo es causa o consecuencia del malestar.',
+  },
+  {
+    primary: 'fobia_social',
+    secondary: ['trastorno_evitativo', 'trastorno_depresivo_mayor', 'trastorno_consumo_alcohol'],
+    probability: 50,
+    clinicalNotes: 'Alcohol como automedicación para ansiedad social es muy frecuente.',
+  },
+  {
+    primary: 'trastorno_bipolar_ii',
+    secondary: ['trastorno_ansiedad_generalizada', 'trastorno_consumo_sustancias', 'tdah'],
+    probability: 65,
+    clinicalNotes: 'Bipolar II infradiagnosticado. Suele presentar como depresión recurrente.',
+  },
+];
+
+// Obtener comorbilidades para un trastorno
+export const getComorbidities = (disorderId: string): string[] => {
+  const entry = comorbidities.find(c => c.primary === disorderId);
+  if (!entry) return [];
+
+  // Aplicar probabilidad
+  if (Math.random() * 100 > entry.probability) return [];
+
+  // Retornar 1-2 comorbilidades aleatorias
+  const shuffled = [...entry.secondary].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.floor(Math.random() * 2) + 1);
+};
+
+// ============================================================================
+// PERSONALIDADES EXPANDIDAS
+// ============================================================================
+
+export interface PersonalityProfile {
+  id: string;
+  name: string;
+  traits: string[];
+  communicationStyle: string;
+  resistanceLevel: 'low' | 'medium' | 'high' | 'very_high';
+  emotionalExpression: 'restricted' | 'moderate' | 'expressive' | 'labile';
+  description: string;
+}
+
+export const personalityProfiles: PersonalityProfile[] = [
+  {
+    id: 'ansioso_evitativo',
+    name: 'Ansioso-Evitativo',
+    traits: ['nervioso/a', 'evitativo/a', 'autocrítico/a', 'perfeccionista'],
+    communicationStyle: 'Habla rápido, se preocupa por cómo le perciben, pide confirmación',
+    resistanceLevel: 'medium',
+    emotionalExpression: 'restricted',
+    description: 'Muy autoconsciente, teme el juicio. Evita conflictos y busca aprobación.',
+  },
+  {
+    id: 'depresivo_apatico',
+    name: 'Depresivo-Apático',
+    traits: ['apático/a', 'pesimista', 'autocrítico/a', 'aislado/a'],
+    communicationStyle: 'Habla lento, pausas largas, tono monótono, respuestas cortas',
+    resistanceLevel: 'high',
+    emotionalExpression: 'restricted',
+    description: 'Baja energía, desesperanza. Cuesta motivarle a hablar o actuar.',
+  },
+  {
+    id: 'irritable_defensivo',
+    name: 'Irritable-Defensivo',
+    traits: ['irritable', 'desconfiado/a', 'reactivo/a', 'impaciente'],
+    communicationStyle: 'Tono cortante, responde con preguntas, se frustra fácilmente',
+    resistanceLevel: 'very_high',
+    emotionalExpression: 'expressive',
+    description: 'A la defensiva, interpreta preguntas como ataques. Difícil establecer rapport.',
+  },
+  {
+    id: 'colaborador_insight',
+    name: 'Colaborador con Insight',
+    traits: ['reflexivo/a', 'colaborador/a', 'articulado/a', 'motivado/a'],
+    communicationStyle: 'Elabora bien, hace conexiones, acepta interpretaciones',
+    resistanceLevel: 'low',
+    emotionalExpression: 'moderate',
+    description: 'Ideal para entrenamiento. Quiere entenderse y mejorar activamente.',
+  },
+  {
+    id: 'somatizador',
+    name: 'Somatizador',
+    traits: ['enfocado/a en síntomas físicos', 'escéptico/a de lo psicológico', 'detallista'],
+    communicationStyle: 'Describe síntomas físicos con precisión, resiste explicaciones psicológicas',
+    resistanceLevel: 'high',
+    emotionalExpression: 'restricted',
+    description: 'Convencido de que el problema es físico. Resiste la conceptualización psicológica.',
+  },
+  {
+    id: 'dependiente_demandante',
+    name: 'Dependiente-Demandante',
+    traits: ['dependiente', 'necesitado/a de aprobación', 'indeciso/a', 'ansioso/a'],
+    communicationStyle: 'Busca consejo directo, pregunta qué hacer, se aferra al terapeuta',
+    resistanceLevel: 'low',
+    emotionalExpression: 'expressive',
+    description: 'Quiere que le digan qué hacer. Puede generar contratransferencia.',
+  },
+  {
+    id: 'intelectualizador',
+    name: 'Intelectualizador',
+    traits: ['analítico/a', 'distante', 'racional', 'evita emociones'],
+    communicationStyle: 'Habla de problemas como si fueran de otro, usa terminología, evita emociones',
+    resistanceLevel: 'medium',
+    emotionalExpression: 'restricted',
+    description: 'Entiende cognitivamente pero desconectado emocionalmente. Difícil acceder a afectos.',
+  },
+  {
+    id: 'dramatico_histrionico',
+    name: 'Dramático-Histriónico',
+    traits: ['expresivo/a', 'dramático/a', 'busca atención', 'seductor/a'],
+    communicationStyle: 'Exagera, usa superlativos, busca reacciones emocionales del terapeuta',
+    resistanceLevel: 'medium',
+    emotionalExpression: 'labile',
+    description: 'Muy expresivo pero superficial. El drama puede distraer de lo importante.',
+  },
+  {
+    id: 'suspicaz_paranoide',
+    name: 'Suspicaz-Paranoide',
+    traits: ['desconfiado/a', 'suspicaz', 'interpretativo', 'vigilante'],
+    communicationStyle: 'Cuestiona las intenciones, interpreta comentarios negativamente',
+    resistanceLevel: 'very_high',
+    emotionalExpression: 'restricted',
+    description: 'Muy difícil establecer confianza. Interpreta neutralidad como hostilidad.',
+  },
+  {
+    id: 'resiliente_afrontador',
+    name: 'Resiliente-Afrontador',
+    traits: ['optimista', 'activo/a', 'buscador/a de soluciones', 'minimizador/a'],
+    communicationStyle: 'Busca soluciones, minimiza el problema, quiere herramientas prácticas',
+    resistanceLevel: 'medium',
+    emotionalExpression: 'moderate',
+    description: 'Parece fuerte pero puede estar evitando procesar emociones difíciles.',
+  },
+];
+
+// Obtener perfil de personalidad aleatorio
+export const getRandomPersonalityProfile = (difficulty: CaseDifficulty): PersonalityProfile => {
+  let availableProfiles: PersonalityProfile[];
+
+  switch (difficulty) {
+    case 'entrenamiento':
+      availableProfiles = personalityProfiles.filter(p => p.resistanceLevel === 'low');
+      break;
+    case 'normal':
+      availableProfiles = personalityProfiles.filter(p =>
+        p.resistanceLevel === 'low' || p.resistanceLevel === 'medium'
+      );
+      break;
+    case 'dificil':
+      availableProfiles = personalityProfiles.filter(p =>
+        p.resistanceLevel === 'medium' || p.resistanceLevel === 'high'
+      );
+      break;
+    case 'realista':
+      availableProfiles = personalityProfiles; // Todos disponibles
+      break;
+    default:
+      availableProfiles = personalityProfiles;
+  }
+
+  return availableProfiles[Math.floor(Math.random() * availableProfiles.length)];
+};
+
+// ============================================================================
+// BACKSTORIES AVANZADAS POR TRASTORNO
+// ============================================================================
+
+export interface BackstoryTemplate {
+  disorderId: string;
+  templates: string[];
+  triggers: string[];
+  familyPatterns: string[];
+  occupationalImpact: string[];
+}
+
+export const backstoryTemplates: BackstoryTemplate[] = [
+  {
+    disorderId: 'trastorno_depresivo_mayor',
+    templates: [
+      'Todo empezó tras {trigger}. Al principio pensé que se me pasaría, pero han pasado {duration} y cada vez es peor. Ya no reconozco a la persona que era antes.',
+      'Vengo porque mi {family} insistió. Yo no creo que tenga nada, solo estoy cansado/a. Pero es verdad que últimamente {symptom}.',
+      'Llevo años sintiéndome así, pero últimamente es insoportable. Antes podía funcionar, ahora {impact}.',
+    ],
+    triggers: ['perder el trabajo', 'la separación', 'la muerte de mi padre/madre', 'la pandemia', 'una ruptura sentimental'],
+    familyPatterns: ['Mi madre también tuvo "lo mismo"', 'En mi familia no se habla de estas cosas', 'Mi padre decía que esto es de débiles'],
+    occupationalImpact: ['He pedido la baja', 'Apenas puedo ir a trabajar', 'Me van a despedir si sigo así', 'Dejé los estudios'],
+  },
+  {
+    disorderId: 'trastorno_ansiedad_generalizada',
+    templates: [
+      'Siempre he sido nervioso/a, pero últimamente es demasiado. No puedo dejar de pensar en {worry}. Es agotador.',
+      'Mi mente no para nunca. De una preocupación salto a otra. {physical_symptom} y no consigo relajarme.',
+      'Todo el mundo me dice que me preocupo demasiado, pero no puedo evitarlo. ¿Y si {catastrophe}?',
+    ],
+    triggers: ['empezar un trabajo nuevo', 'tener hijos', 'una enfermedad en la familia', 'problemas económicos'],
+    familyPatterns: ['Mi madre es igual', 'En casa siempre había tensión', 'Me enseñaron a anticipar lo peor'],
+    occupationalImpact: ['No puedo concentrarme', 'Reviso todo mil veces', 'Evito tomar decisiones importantes'],
+  },
+  {
+    disorderId: 'trastorno_panico',
+    templates: [
+      'El primer ataque fue {when}. Pensé que me moría. Desde entonces vivo con miedo de que vuelva a pasar.',
+      'Fui a urgencias {times} veces. Me dijeron que era ansiedad pero yo sentía que era el corazón. Ahora evito {place}.',
+      'Antes era una persona normal. Ahora mi vida gira en torno a evitar que me dé "eso". Es humillante.',
+    ],
+    triggers: ['hace 6 meses en el metro', 'en medio de una reunión', 'conduciendo', 'sin motivo aparente'],
+    familyPatterns: ['A mi hermana le pasa igual', 'Nadie en mi familia lo entiende'],
+    occupationalImpact: ['No puedo coger transporte público', 'Evito las reuniones', 'Trabajo desde casa para evitar salir'],
+  },
+  {
+    disorderId: 'trastorno_estres_postraumatico',
+    templates: [
+      'Después de {trauma}, ya nada fue igual. Intento no pensar en ello pero está siempre ahí.',
+      'Hay cosas que no puedo hacer desde {event}. {avoidance}. La gente no entiende por qué.',
+      'Las pesadillas son lo peor. Cada noche revivo {fragment}. Tengo miedo de dormir.',
+    ],
+    triggers: ['el accidente', 'lo que me hicieron', 'aquello que pasó', 'la agresión'],
+    familyPatterns: ['No le he contado a nadie lo que pasó', 'Mi pareja sabe algo pero no todo'],
+    occupationalImpact: ['No puedo volver a ese lugar', 'Cualquier cosa me sobresalta', 'Estoy siempre en alerta'],
+  },
+  {
+    disorderId: 'trastorno_limite_personalidad',
+    templates: [
+      'Mis relaciones siempre terminan igual: intensas al principio, desastrosas al final. No sé quién soy sin {other}.',
+      'A veces me siento vacío/a, como si no existiera. Entonces hago cosas que luego me arrepiento.',
+      'La gente dice que soy "demasiado". Demasiado intenso/a, demasiado sensible. Pero así es como siento.',
+    ],
+    triggers: ['cuando alguien me abandona', 'cuando me siento solo/a', 'sin motivo aparente'],
+    familyPatterns: ['Mi infancia fue... complicada', 'No tuve una familia estable', 'Hubo cosas que no debieron pasar'],
+    occupationalImpact: ['He perdido trabajos por conflictos', 'Mis compañeros me tienen miedo', 'No aguanto en ningún sitio'],
+  },
+];
+
+// Generar backstory personalizada
+export const generateBackstory = (disorderId: string, patientName: string): string => {
+  const template = backstoryTemplates.find(t => t.disorderId === disorderId);
+  if (!template) {
+    return `${patientName} lleva una temporada sintiéndose mal. Ha decidido buscar ayuda profesional porque la situación le está afectando en su día a día.`;
+  }
+
+  // Seleccionar elementos aleatorios
+  const baseTemplate = template.templates[Math.floor(Math.random() * template.templates.length)];
+  const trigger = template.triggers[Math.floor(Math.random() * template.triggers.length)];
+  const family = template.familyPatterns[Math.floor(Math.random() * template.familyPatterns.length)];
+  const impact = template.occupationalImpact[Math.floor(Math.random() * template.occupationalImpact.length)];
+
+  // Reemplazar placeholders
+  let backstory = baseTemplate
+    .replace('{trigger}', trigger)
+    .replace('{duration}', `${Math.floor(Math.random() * 12) + 3} meses`)
+    .replace('{family}', ['pareja', 'madre', 'hermano/a', 'amigo/a'][Math.floor(Math.random() * 4)])
+    .replace('{symptom}', ['no tengo ganas de nada', 'me cuesta levantarme', 'lloro sin motivo'][Math.floor(Math.random() * 3)])
+    .replace('{impact}', impact)
+    .replace('{worry}', ['el trabajo', 'mi familia', 'el dinero', 'la salud'][Math.floor(Math.random() * 4)])
+    .replace('{physical_symptom}', ['Me duele la cabeza constantemente', 'Tengo el estómago revuelto', 'No duermo bien'][Math.floor(Math.random() * 3)])
+    .replace('{catastrophe}', ['algo malo pasa', 'me despiden', 'enfermo gravemente'][Math.floor(Math.random() * 3)])
+    .replace('{when}', ['hace 6 meses', 'el año pasado', 'hace unas semanas'][Math.floor(Math.random() * 3)])
+    .replace('{times}', `${Math.floor(Math.random() * 5) + 2}`)
+    .replace('{place}', ['el metro', 'los centros comerciales', 'conducir solo/a'][Math.floor(Math.random() * 3)])
+    .replace('{trauma}', trigger)
+    .replace('{event}', trigger)
+    .replace('{avoidance}', ['Evito ciertos lugares', 'No puedo ver ciertas cosas', 'No hablo de ello'][Math.floor(Math.random() * 3)])
+    .replace('{fragment}', ['lo mismo una y otra vez', 'partes que quisiera olvidar'][Math.floor(Math.random() * 2)])
+    .replace('{other}', ['otra persona', 'alguien que me quiera'][Math.floor(Math.random() * 2)]);
+
+  // Añadir contexto familiar
+  backstory += ` ${family}.`;
+
+  return backstory;
 };

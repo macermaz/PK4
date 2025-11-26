@@ -16,7 +16,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useApp } from '../contexts/AppContext';
-import { Case } from '../types';
+import { Case, Message } from '../types';
 import { getTreatmentsByDisorder, getFirstLineTreatments, getAllTreatments, isTreatmentCorrectForDisorder, Treatment } from '../data/clinicalData';
 import { IS_DEVELOPMENT } from '../config/environment';
 import { getTreatmentWaitTime } from '../config/environment';
@@ -27,7 +27,7 @@ type TreatmentRouteProp = RouteProp<RootStackParamList, 'Treatment'>;
 const TreatmentScreen: React.FC = () => {
   const navigation = useNavigation<TreatmentNavigationProp>();
   const route = useRoute<TreatmentRouteProp>();
-  const { state, dispatch, calculateFinalScore } = useApp();
+  const { state, dispatch, calculateFinalScore, addMessage, generateId } = useApp();
   const { caseId } = route.params;
 
   const [currentCase, setCurrentCase] = useState<any>(null);
@@ -113,6 +113,56 @@ const TreatmentScreen: React.FC = () => {
     return isTreatmentCorrectForDisorder(treatmentId, currentCase.patient.disorder);
   };
 
+  // Respuestas automáticas del paciente según personalidad
+  const getPatientAcceptanceResponse = (): string => {
+    if (!currentCase?.patient) return 'De acuerdo, lo intentaré.';
+
+    const personality = currentCase.patient.personality?.toLowerCase() || '';
+    const name = currentCase.patient.name || 'Paciente';
+
+    const responses: { [key: string]: string[] } = {
+      ansioso: [
+        'No sé si podré hacerlo bien, pero... vale, lo intentaré. ¿Y si no funciona?',
+        'Me da un poco de miedo empezar, pero confío en usted. Lo intentaré.',
+        'Espero poder seguir todo esto... Lo voy a intentar, de verdad.',
+      ],
+      depresivo: [
+        'Supongo que puedo intentarlo... aunque no creo que cambie nada.',
+        'Vale... lo intentaré, aunque no tengo muchas esperanzas.',
+        'De acuerdo. No sé si tengo fuerzas, pero lo intentaré.',
+      ],
+      irritable: [
+        'Vale, vale, lo haré. Pero si no funciona, quiero que lo sepas.',
+        'Está bien, supongo que no pierdo nada por intentarlo.',
+        'Ok, vamos a probar esto. Espero que funcione.',
+      ],
+      evitativo: [
+        'Mm... de acuerdo. Intentaré seguir las indicaciones.',
+        'Bueno, si usted cree que es lo mejor... lo intentaré.',
+        'Vale, haré lo que pueda...',
+      ],
+      perfeccionista: [
+        'Entendido. Seguiré las indicaciones al pie de la letra.',
+        'De acuerdo, me comprometo a seguir el plan exactamente como indica.',
+        'Perfecto, lo haré tal cual me lo plantea.',
+      ],
+      default: [
+        'De acuerdo, doctor/a. Haré todo lo posible por seguir el tratamiento.',
+        'Gracias por el plan. Lo intentaré con todas mis fuerzas.',
+        'Vale, voy a ponerme con ello. Gracias.',
+      ],
+    };
+
+    // Buscar respuestas según personalidad
+    for (const [trait, resps] of Object.entries(responses)) {
+      if (trait !== 'default' && personality.includes(trait)) {
+        return resps[Math.floor(Math.random() * resps.length)];
+      }
+    }
+
+    return responses.default[Math.floor(Math.random() * responses.default.length)];
+  };
+
   // Enviar tratamiento
   const sendTreatment = () => {
     if (!selectedTreatment) {
@@ -132,9 +182,31 @@ const TreatmentScreen: React.FC = () => {
           text: 'Enviar',
           onPress: () => {
             const treatmentData = `${treatment?.name}\n\nTécnicas: ${treatment?.techniques.join(', ')}\n\nNotas adicionales: ${customNotes || 'Ninguna'}`;
-
             const currentAttempts = currentCase?.treatmentAttempts || 0;
 
+            // 1. Añadir mensaje del usuario enviando el plan de tratamiento como "archivo"
+            const treatmentMessage: Message = {
+              id: generateId(),
+              text: `📎 Plan de tratamiento enviado:\n\n🏷️ ${treatment?.name}\n\n📋 Técnicas recomendadas:\n${treatment?.techniques.map((t: string) => `• ${t}`).join('\n')}\n\n📝 Indicaciones: ${customNotes || 'Seguir plan según indicaciones estándar.'}`,
+              sender: 'user',
+              timestamp: new Date(),
+              type: 'text',
+            };
+            addMessage(caseId, treatmentMessage);
+
+            // 2. Respuesta automática del paciente aceptando intentar el tratamiento
+            setTimeout(() => {
+              const patientResponse: Message = {
+                id: generateId(),
+                text: getPatientAcceptanceResponse(),
+                sender: 'patient',
+                timestamp: new Date(),
+                type: 'text',
+              };
+              addMessage(caseId, patientResponse);
+            }, 1500);
+
+            // 3. Actualizar estado del caso
             dispatch({
               type: 'UPDATE_CASE',
               payload: {
@@ -143,7 +215,7 @@ const TreatmentScreen: React.FC = () => {
                   treatment: treatmentData,
                   treatmentSentDate: new Date().toISOString(),
                   treatmentAttempts: currentAttempts + 1,
-                  status: 'awaiting_result', // Nuevo estado: esperando respuesta
+                  status: 'awaiting_result',
                 },
               },
             });
@@ -151,11 +223,21 @@ const TreatmentScreen: React.FC = () => {
             setWaitingForResult(true);
             updateTimeRemaining(new Date().toISOString());
 
-            Alert.alert(
-              'Tratamiento enviado',
-              'El paciente evaluará tu propuesta. Recibirás una respuesta en 48 horas.',
-              [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+            // 4. Navegar de vuelta y mostrar notificación
+            navigation.goBack();
+
+            // 5. En DEV: tras 10 segundos, simular notificación de chat nuevo con resultado
+            const resultWaitTime = IS_DEVELOPMENT ? 10000 : getTreatmentWaitTime();
+            setTimeout(() => {
+              // Actualizar unreadCount para indicar nuevo mensaje
+              dispatch({
+                type: 'UPDATE_CASE',
+                payload: {
+                  id: caseId,
+                  updates: { unreadCount: 1 },
+                },
+              });
+            }, resultWaitTime);
           },
         },
       ]
@@ -702,6 +784,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#4CAF50',
     fontWeight: '500',
+  },
+  devCorrectTag: {
+    backgroundColor: '#FF5722',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  devCorrectText: {
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '700',
   },
   treatmentDescription: {
     fontSize: 14,

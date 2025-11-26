@@ -1,11 +1,21 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, Case, Patient, Message, CaseDifficulty, CaseNote, LifeAspects, CaseFinalScore } from '../types';
+import { User, Case, Patient, Message, CaseDifficulty, CaseNote, LifeAspects, CaseFinalScore, UserProfile } from '../types';
 import { mockPatients } from '../data/mockData';
 import { IS_DEVELOPMENT, getInitialUser, log } from '../config/environment';
 
 // Re-exportar para compatibilidad con código existente
 export const DEV_MODE = IS_DEVELOPMENT;
+
+// Perfil DEV predefinido para modo desarrollador
+const DEV_PROFILE: UserProfile = {
+  id: 'dev_profile_001',
+  name: 'Developer',
+  gender: 'masculine',
+  specialization: 'Psicología Clínica (Modo DEV)',
+  createdAt: new Date().toISOString(),
+  isDev: true,
+};
 
 // Obtener configuración inicial del usuario desde environment.ts
 const initialUserConfig = getInitialUser();
@@ -20,6 +30,7 @@ interface AppState {
 
 const initialState: AppState = {
   user: {
+    profile: DEV_PROFILE, // Perfil DEV por defecto
     level: initialUserConfig.level,
     xp: initialUserConfig.xp,
     maxXp: 100,
@@ -59,7 +70,8 @@ type AppAction =
   | { type: 'UPDATE_STREAK' }
   | { type: 'COMPLETE_CASE'; payload: { caseId: string; correct: boolean; xpGained: number; coinsGained: number } }
   | { type: 'CANCEL_CASE'; payload: string }
-  | { type: 'ADD_MESSAGE'; payload: { caseId: string; message: Message } };
+  | { type: 'ADD_MESSAGE'; payload: { caseId: string; message: Message } }
+  | { type: 'MARK_MESSAGES_READ'; payload: string };
 
 // Reducer
 const appReducer = (state: AppState, action: AppAction): AppState => {
@@ -205,7 +217,21 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
                 messages: [...case_.messages, action.payload.message],
                 lastMessage: action.payload.message.text,
                 lastMessageTime: new Date().toLocaleTimeString(),
+                // Incrementar unreadCount solo si el mensaje es del paciente
+                unreadCount: action.payload.message.sender === 'patient'
+                  ? (case_.unreadCount || 0) + 1
+                  : case_.unreadCount,
               }
+            : case_
+        ),
+      };
+
+    case 'MARK_MESSAGES_READ':
+      return {
+        ...state,
+        cases: state.cases.map(case_ =>
+          case_.id === action.payload
+            ? { ...case_, unreadCount: 0 }
             : case_
         ),
       };

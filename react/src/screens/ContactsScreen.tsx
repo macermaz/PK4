@@ -217,16 +217,18 @@ const ContactsScreen: React.FC = () => {
             </View>
 
             {/* Tests aplicados */}
-            {selectedContact.batteryApplied && (
+            {selectedContact.testsApplied && selectedContact.testsApplied.length > 0 && (
               <View style={styles.infoSection}>
-                <Text style={styles.sectionTitle}>Tests aplicados</Text>
-                <View style={styles.testItem}>
-                  <Icon name="file-text-o" size={16} color="#4A90E2" />
-                  <Text style={styles.testName}>{selectedContact.batteryApplied}</Text>
-                  <TouchableOpacity style={styles.viewButton}>
-                    <Text style={styles.viewButtonText}>Ver</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.sectionTitle}>Tests aplicados ({selectedContact.testsApplied.length}/2)</Text>
+                {selectedContact.testsResults?.map((result, index) => (
+                  <View key={index} style={styles.testItem}>
+                    <Icon name="file-text-o" size={16} color="#4A90E2" />
+                    <Text style={styles.testName}>{result.testName}</Text>
+                    <TouchableOpacity style={styles.viewButton}>
+                      <Text style={styles.viewButtonText}>Ver</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
             )}
 

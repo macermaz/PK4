@@ -1,4 +1,16 @@
+export type Gender = 'masculine' | 'feminine';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  gender: Gender;
+  specialization?: string;
+  createdAt: string;
+  isDev: boolean; // Perfil de desarrollador con funciones especiales
+}
+
 export interface User {
+  profile: UserProfile;
   level: number;
   xp: number;
   maxXp: number;
@@ -24,6 +36,7 @@ export interface UserSettings {
 export interface Patient {
   id: string;
   name: string;
+  gender: Gender; // Género del paciente
   age: number;
   occupation: string;
   avatar: string;

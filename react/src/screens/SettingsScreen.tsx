@@ -11,7 +11,6 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -343,10 +342,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <LinearGradient
-      colors={['#6C757D', '#5a6268']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#6C757D" />
 
       {/* Header */}
@@ -525,13 +521,14 @@ const SettingsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#6C757D',
   },
   header: {
     backgroundColor: 'transparent',

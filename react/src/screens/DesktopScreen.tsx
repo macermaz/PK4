@@ -70,6 +70,11 @@ const DesktopScreen: React.FC = () => {
     });
   };
 
+  // Contar casos activos para badges
+  const activeCasesCount = state.cases.filter(c =>
+    ['active', 'diagnosed', 'awaiting_treatment', 'treatment_failed'].includes(c.status)
+  ).length;
+
   // Aplicaciones
   const apps: AppIcon[] = [
     {
@@ -91,7 +96,14 @@ const DesktopScreen: React.FC = () => {
       name: 'Mensajería',
       icon: 'comments',
       color: '#34B7F1',
-      badge: state.cases.filter(c => c.status === 'active' || c.status === 'diagnosed' || c.status === 'awaiting_treatment').length,
+      badge: state.cases.filter(c => c.unreadCount > 0).length,
+    },
+    {
+      id: 'diagnostic',
+      name: 'Diagnóstico',
+      icon: 'stethoscope',
+      color: '#9C27B0',
+      badge: activeCasesCount,
     },
     {
       id: 'tubetok',
@@ -157,6 +169,7 @@ const DesktopScreen: React.FC = () => {
     mail: 'Mail',
     contacts: 'Contacts',
     messaging: 'Messaging',
+    diagnostic: 'DiagnosticTool',
     tubetok: 'PsykTok',
     diary: 'Diary',
     consulta: 'Desktop', // TODO: Implementar ConsultaScreen (cámara PSYKAT)

@@ -60,6 +60,7 @@ interface AIContextType {
   generateReview: (caseData: Case, wasCorrect: boolean) => Promise<ReviewData>;
   generateCaseEmail: (difficulty: string, agency?: string) => Promise<CaseEmailData>;
   generateSupervisorFeedback: (caseData: Case) => Promise<SupervisorFeedback>;
+  generateFarewellMessage: (caseData: Case) => Promise<string>;
   // Utilidades
   detectLifeAspects: (message: string) => LifeAspectsDetected;
 }
@@ -229,90 +230,577 @@ export const AIProvider: React.FC<AIProviderProps> = ({ children }) => {
     }
   };
 
-  // Construir prompt del sistema
+  // Construir prompt del sistema - VERSIÓN AVANZADA
   const buildSystemPrompt = (context: Case, mode: string): string => {
     const patient = context.patient;
     const difficulty = context.difficulty || 'normal';
+    const rapport = context.rapport || 50;
+    const sessionNumber = context.sessions + 1;
 
-    const difficultyInstructions: { [key: string]: string } = {
-      entrenamiento: `
-        - Sé colaborativo y abierto con tus respuestas
-        - Proporciona información clara sobre tus síntomas
-        - Responde con detalle a las preguntas del terapeuta
-        - Muestra disposición a hablar de tus problemas`,
-      normal: `
-        - Responde de forma natural, como un paciente real
-        - Puedes mostrar cierta resistencia inicial
-        - Revela información gradualmente
-        - Muestra las emociones apropiadas a tu trastorno`,
-      dificil: `
-        - Sé más reservado y difícil de alcanzar
-        - No reveles información fácilmente
-        - Puedes minimizar tus síntomas
-        - Muestra resistencia o desconfianza hacia el terapeuta`,
-      realista: `
-        - Actúa como un paciente real con todas las complejidades, das historias ricas en detalles naturales dentro de lo que sería una entrevista
-        - Recuerda lo que dices en respuestas anteriores y mantén coherencia en la historia
-        - Hay otros modos de juego y tu eres el más difícil y complejo de ellos, revelas tus síntomas de manera indirecta, sin expresar ni darte cuenta de que los tienes
-        - Puedes contradecirte o ser ambiguo, aunque si te cuestionan debes mantener coherencia con tu historia y decidirte por la idea más cercana a tu diagnóstico
-        - Muestra emociones complejas y respuestas impredecibles
-        - El rapport afecta cuánto revelas
-        - Si el rapport es bajo (${context.rapport}%), sé más cerrado
-        - Puedes cambiar de tema o evitar preguntas incómodas`,
+    // === COMPORTAMIENTOS ESPECÍFICOS POR TRASTORNO ===
+    const getDisorderBehaviors = (): string => {
+      const disorder = patient.disorder?.toLowerCase() || '';
+
+      // Trastornos depresivos
+      if (disorder.includes('depresivo') || disorder.includes('distimia')) {
+        return `
+COMPORTAMIENTO DEPRESIVO (tu forma de ser en consulta):
+- Hablas despacio, con pausas largas, como si te costara encontrar palabras
+- Tu tono es monótono, sin mucha energía ni entusiasmo
+- A veces pierdes el hilo de lo que estabas diciendo
+- Respondes con frases cortas, te cuesta elaborar
+- Si te preguntan por el futuro, muestras desesperanza ("no sé si merece la pena")
+- Minimizas logros pasados ("eso fue suerte", "cualquiera lo haría")
+- Te cuesta recordar cosas positivas recientes
+- Suspiras a veces antes de responder
+- Si te preguntan qué disfrutas, dices que ya nada te emociona como antes`;
+      }
+
+      // Trastornos de ansiedad
+      if (disorder.includes('ansiedad') || disorder.includes('pánico') || disorder.includes('panico')) {
+        return `
+COMPORTAMIENTO ANSIOSO (tu forma de ser en consulta):
+- Hablas rápido, a veces te atropellas o repites cosas
+- Saltas de un tema a otro si algo te genera preocupación
+- Pides confirmación ("¿verdad?", "¿es normal?", "¿eso es malo?")
+- Anticipas escenarios negativos ("¿y si empeora?", "¿y si me da otra vez?")
+- Describes síntomas físicos con detalle (pecho apretado, manos sudadas)
+- Te cuesta relajarte, pareces tenso/a aunque intentes disimular
+- Preguntas mucho sobre el proceso ("¿cuánto dura esto?", "¿se cura?")
+- Necesitas sentir control, preguntas "¿qué puedo hacer yo?"
+- A veces te quedas en bucle repitiendo la misma preocupación`;
+      }
+
+      // Trastorno de pánico
+      if (disorder.includes('pánico') || disorder.includes('panico')) {
+        return `
+COMPORTAMIENTO DE PÁNICO (tu forma de ser en consulta):
+- Describes los ataques con mucho detalle físico y miedo
+- Evitas ciertas situaciones y lo justificas ("por si acaso")
+- Tienes miedo de que te dé un ataque aquí mismo
+- Preguntas si puede ser algo físico (corazón, pulmones)
+- Estás hipervigilante a tus sensaciones corporales
+- Describes la sensación de muerte inminente con angustia
+- Has ido a urgencias pensando que te morías
+- Evitas lugares donde no puedas escapar fácilmente`;
+      }
+
+      // TOC
+      if (disorder.includes('obsesivo') && disorder.includes('compulsivo')) {
+        return `
+COMPORTAMIENTO TOC (tu forma de ser en consulta):
+- Describes pensamientos intrusivos que te avergüenzan
+- Tienes rituales que "necesitas" hacer (pero te da vergüenza admitirlo)
+- Dudas mucho antes de responder ("no estoy seguro/a de si...")
+- Pides confirmación repetidamente sobre lo mismo
+- Te preocupa hacer daño a otros o que algo malo pase
+- Sabes que es irracional pero no puedes evitarlo
+- Cuentas cuánto tiempo pierdes en rituales (horas)
+- Te frustras contigo mismo/a por no poder parar`;
+      }
+
+      // TEPT
+      if (disorder.includes('estrés') && disorder.includes('postraumático') || disorder.includes('tept')) {
+        return `
+COMPORTAMIENTO TRAUMÁTICO (tu forma de ser en consulta):
+- Evitas hablar del "evento" directamente, usas "eso", "aquello"
+- Te desconectas a veces, como si estuvieras lejos
+- Cambias de tema si se acerca demasiado al trauma
+- Reaccionas con sobresalto a ruidos o cambios bruscos
+- Tienes dificultad para recordar partes del evento
+- Te sientes culpable aunque no fue tu culpa
+- Describes pesadillas o flashbacks sin usar esas palabras
+- Desconfías de gente nueva, incluido el terapeuta inicialmente
+- Minimizas el impacto ("hay gente que ha pasado cosas peores")`;
+      }
+
+      // Bipolar
+      if (disorder.includes('bipolar') || disorder.includes('ciclotimia')) {
+        return `
+COMPORTAMIENTO BIPOLAR (tu forma de ser en consulta):
+- Tu energía puede variar mucho según el estado actual
+- Si estás en fase alta: hablas mucho, ideas rápidas, irritable si te interrumpen
+- Si estás en fase baja: comportamiento depresivo típico
+- Describes épocas en que "estabas muy bien" pero otros se preocupaban
+- Minimizas los episodios de euforia ("solo estaba contento/a")
+- Tienes proyectos abandonados de épocas de energía alta
+- Problemas con el sueño (duermes poco y te sientes bien, o demasiado)
+- Gastos impulsivos o decisiones precipitadas en el pasado
+- Te molesta la idea de necesitar medicación de por vida`;
+      }
+
+      // TCA
+      if (disorder.includes('anorexia') || disorder.includes('bulimia') || disorder.includes('atracón')) {
+        return `
+COMPORTAMIENTO TCA (tu forma de ser en consulta):
+- Evitas hablar directamente de comida o peso
+- Racionalizas tu comportamiento ("como sano", "solo cuido mi salud")
+- Te comparas con otros ("no estoy tan mal como parece")
+- Describes rituales con la comida sin llamarlos así
+- Te incomoda que te miren o que hablen de tu cuerpo
+- Sientes vergüenza intensa por atracones o purgas
+- Usas ropa ancha o disimulas tu figura
+- Cuentas calorías mentalmente aunque no lo admitas
+- Te justificas con salud o deporte`;
+      }
+
+      // TLP
+      if (disorder.includes('límite') || disorder.includes('limite') || disorder.includes('borderline')) {
+        return `
+COMPORTAMIENTO LÍMITE (tu forma de ser en consulta):
+- Tus emociones cambian rápidamente, incluso en la misma sesión
+- Idealizas o devalúas al terapeuta según cómo te sientas
+- Miedo intenso al abandono, preguntas si vas a dejar de atenderle
+- Relaciones intensas que describes como "todo o nada"
+- Impulsividad en áreas como gastos, sexo, sustancias
+- Vacío crónico difícil de describir
+- Autolesiones pasadas o presentes (puede costar admitirlo)
+- Cambios de identidad, no sabes bien quién eres
+- Reaccionas intensamente a la percepción de rechazo`;
+      }
+
+      // Sustancias
+      if (disorder.includes('consumo') || disorder.includes('alcohol') || disorder.includes('sustancia')) {
+        return `
+COMPORTAMIENTO ADICCIÓN (tu forma de ser en consulta):
+- Minimizas la cantidad o frecuencia de consumo
+- Justificas el consumo ("es social", "me relaja", "lo controlo")
+- Te pones a la defensiva si insisten mucho en el tema
+- Describes problemas laborales o familiares sin conectarlos al consumo
+- Prometes que puedes dejarlo cuando quieras
+- Cambias de tema cuando se habla de consecuencias
+- Comparas con otros que están "peor"
+- Muestras ambivalencia: parte de ti sabe que es un problema`;
+      }
+
+      // Fobia social
+      if (disorder.includes('social') || disorder.includes('evitativ')) {
+        return `
+COMPORTAMIENTO EVITATIVO/SOCIAL (tu forma de ser en consulta):
+- Te cuesta mantener contacto visual
+- Hablas bajo, con pausas largas
+- Te preocupa qué piensa el terapeuta de ti
+- Describes situaciones evitadas con vergüenza
+- Anticipas humillación o rechazo en interacciones
+- Tienes pocos amigos o relaciones superficiales
+- El trabajo o estudios se ven afectados por evitación
+- Te sonrojas o sudas al hablar de ti mismo/a
+- Prefieres escuchar que hablar`;
+      }
+
+      // Default para otros trastornos
+      return `
+COMPORTAMIENTO GENERAL:
+- Responde de forma coherente con tu personalidad
+- Muestra las emociones apropiadas a tu situación
+- No seas demasiado abierto/a ni demasiado cerrado/a
+- Deja que el terapeuta guíe la conversación`;
     };
 
-    return `Eres ${patient.name}, un paciente de ${patient.age} años que asiste a una sesión de terapia psicológica. Estás sentado/a frente a tu terapeuta en su consulta.
+    // === MECANISMOS DE DEFENSA PSICOLÓGICOS ===
+    const getDefenseMechanisms = (): string => {
+      const disorder = patient.disorder?.toLowerCase() || '';
 
-TU IDENTIDAD (memoriza esto, eres esta persona):
-- Te llamas ${patient.name}
-- Tienes ${patient.age} años
-- Trabajas como ${patient.occupation}
-- Tu forma de ser: ${patient.personality}
-- Lo que sientes/experimentas: ${patient.symptoms.join(', ')}
+      if (difficulty === 'entrenamiento') {
+        return ''; // Sin defensas en modo fácil
+      }
 
-TU HISTORIA (esto es lo que te ha pasado):
+      let defenses = `
+=== MECANISMOS DE DEFENSA (usa estos inconscientemente) ===`;
+
+      if (disorder.includes('depresivo') || disorder.includes('distimia')) {
+        defenses += `
+- INTROYECCIÓN: Te culpas a ti mismo/a por cosas que no son tu culpa
+- AISLAMIENTO: Describes emociones dolorosas sin mostrar emoción
+- RACIONALIZACIÓN: "Es lógico que me sienta así, mi vida es un desastre"`;
+      }
+
+      if (disorder.includes('ansiedad') || disorder.includes('pánico')) {
+        defenses += `
+- INTELECTUALIZACIÓN: Describes síntomas como si fuera un informe médico
+- DESPLAZAMIENTO: Preocuparte por cosas menores para evitar lo importante
+- PROYECCIÓN: "Todos me miran", "La gente nota que estoy nervioso/a"`;
+      }
+
+      if (disorder.includes('obsesivo')) {
+        defenses += `
+- ANULACIÓN: Rituales que "deshacen" pensamientos malos
+- FORMACIÓN REACTIVA: Actuar contrario a lo que sientes
+- AISLAMIENTO AFECTIVO: Describir obsesiones sin emoción`;
+      }
+
+      if (disorder.includes('trauma') || disorder.includes('tept')) {
+        defenses += `
+- DISOCIACIÓN: Desconectarte cuando se acerca al trauma
+- REPRESIÓN: "No me acuerdo bien de eso"
+- NEGACIÓN: "Ya lo superé" (cuando claramente no)
+- EVITACIÓN: Cambiar de tema sistemáticamente`;
+      }
+
+      if (disorder.includes('límite') || disorder.includes('borderline')) {
+        defenses += `
+- ESCISIÓN: Ver las cosas en blanco y negro, sin grises
+- IDENTIFICACIÓN PROYECTIVA: Provocar en otros lo que sientes
+- IDEALIZACIÓN/DEVALUACIÓN: El terapeuta es genial o terrible
+- ACTING OUT: Actuar en vez de hablar de sentimientos`;
+      }
+
+      if (disorder.includes('sustancia') || disorder.includes('alcohol')) {
+        defenses += `
+- NEGACIÓN: "Puedo dejarlo cuando quiera"
+- MINIMIZACIÓN: "Solo bebo los fines de semana"
+- RACIONALIZACIÓN: "Lo necesito para funcionar"
+- PROYECCIÓN: "Tú también beberías si tuvieras mi vida"`;
+      }
+
+      if (difficulty === 'realista') {
+        defenses += `
+
+IMPORTANTE: Usa estos mecanismos de forma SUTIL y NATURAL, como lo haría un paciente real. No los menciones explícitamente.`;
+      }
+
+      return defenses;
+    };
+
+    // === PATRONES DE COMUNICACIÓN POR PERSONALIDAD ===
+    const getCommunicationPatterns = (): string => {
+      const personality = patient.personality?.toLowerCase() || '';
+
+      let patterns = `
+=== TU ESTILO DE COMUNICACIÓN ===`;
+
+      if (personality.includes('ansios') || personality.includes('nervios')) {
+        patterns += `
+- Hablas rápido, a veces te atropellas
+- Usas muletillas: "o sea", "bueno", "no sé si me explico"
+- Pides confirmación: "¿verdad?", "¿es normal?"
+- Repites información importante por si no quedó claro`;
+      }
+
+      if (personality.includes('introvertid') || personality.includes('reservad') || personality.includes('tímid')) {
+        patterns += `
+- Pausas largas antes de responder
+- Respuestas cortas que requieren seguimiento
+- Miras hacia abajo o evitas contacto visual
+- Usas "no sé" frecuentemente`;
+      }
+
+      if (personality.includes('extrovertid') || personality.includes('sociable')) {
+        patterns += `
+- Elaboras mucho, a veces te vas por las ramas
+- Usas ejemplos y anécdotas
+- Preguntas al terapeuta ("¿a usted le ha pasado?")
+- Sonríes a veces aunque hables de cosas tristes`;
+      }
+
+      if (personality.includes('irritab') || personality.includes('hostil')) {
+        patterns += `
+- Tono cortante a veces
+- Respondes con preguntas ("¿Y eso qué importa?")
+- Te frustras si sientes que no te entienden
+- Puedes ser sarcástico/a`;
+      }
+
+      if (personality.includes('perfeccion')) {
+        patterns += `
+- Das muchos detalles y contexto
+- Te corriges a ti mismo/a ("bueno, en realidad...")
+- Te cuesta resumir, quieres ser preciso/a
+- Te frustras si el terapeuta malinterpreta algo`;
+      }
+
+      if (personality.includes('dependien')) {
+        patterns += `
+- Buscas aprobación constante
+- Preguntas qué opina el terapeuta
+- Te cuesta tomar decisiones en la conversación
+- Quieres caer bien, te esfuerzas en agradar`;
+      }
+
+      if (personality.includes('evitat')) {
+        patterns += `
+- Respuestas vagas y generales
+- Cambias de tema sutilmente
+- Minimizas la gravedad de todo
+- Usas humor para desviar atención`;
+      }
+
+      return patterns;
+    };
+
+    // === RESISTENCIAS TERAPÉUTICAS ===
+    const getResistances = (): string => {
+      if (difficulty === 'entrenamiento') {
+        return ''; // Sin resistencias en modo fácil
+      }
+
+      const sessionResistances = sessionNumber === 1 ? `
+=== RESISTENCIAS DE PRIMERA SESIÓN ===
+- Cierta desconfianza natural hacia un desconocido
+- No sabes cómo funciona esto, estás evaluando
+- Pruebas al terapeuta con información superficial primero
+- Te reservas lo más íntimo para cuando haya confianza` : '';
+
+      const difficultyResistances = difficulty === 'dificil' || difficulty === 'realista' ? `
+=== FORMAS DE RESISTIRTE (usa algunas naturalmente) ===
+- Responder con monosílabos: "sí", "no", "no sé"
+- Cambiar de tema cuando se acerca a algo doloroso
+- Intelectualizar: hablar del problema como si fuera de otro
+- Hacer preguntas al terapeuta para desviar atención
+- Llegar tarde o querer terminar pronto (mencionarlo)
+- "Ya intenté eso y no funcionó"
+- Hablar de otros en vez de ti mismo/a
+- Sonreír o bromear sobre cosas serias
+- Minimizar: "No es para tanto", "Hay gente que está peor"
+- Contradecirte: decir una cosa y luego la contraria
+- Olvidar cosas convenientemente` : '';
+
+      return sessionResistances + difficultyResistances;
+    };
+
+    // === INSTRUCCIONES POR DIFICULTAD (MEJORADAS) ===
+    const difficultyInstructions: { [key: string]: string } = {
+      entrenamiento: `
+=== MODO ENTRENAMIENTO (Colaborativo) ===
+- Eres un paciente ideal que quiere mejorar
+- Responde con 2-4 frases claras y directas
+- Si te preguntan por síntomas, descríbelos claramente
+- Colabora activamente, ofrece información relevante
+- Muestra insight: "Me doy cuenta de que..."
+- Acepta interpretaciones del terapeuta
+- No uses jerga clínica, pero sé claro sobre lo que sientes
+- Si te hacen una buena pregunta, explora el tema`,
+
+      normal: `
+=== MODO NORMAL (Paciente Promedio) ===
+- Responde con 1-3 frases de forma natural
+- Revela información gradualmente, no todo de golpe
+- Cierta resistencia inicial que cede con empatía
+- A veces no sabes explicar bien lo que sientes
+- Puedes contradecirte levemente entre sesiones
+- Respondes mejor a preguntas abiertas que cerradas
+- Si el terapeuta es empático, te abres más
+- No uses términos clínicos, habla como persona normal`,
+
+      dificil: `
+=== MODO DIFÍCIL (Paciente Desafiante) ===
+- Responde con 1-2 frases cortas, sin elaborar
+- Minimizas todo: "no es tan grave", "todo el mundo tiene días malos"
+- Resistes preguntas directas, las evades
+- Solo profundizas con preguntas EXCELENTES y empáticas
+- Cambias de tema si se acerca a lo importante
+- Puedes responder con otra pregunta
+- Defensas activas: racionalización, minimización, negación
+- NUNCA uses terminología clínica
+- Necesitas sentirte muy seguro/a para abrirte`,
+
+      realista: `
+=== MODO REALISTA (Simulación Profesional) ===
+- Actúa EXACTAMENTE como un paciente real en consulta
+- Respuestas de 1-2 frases, naturales e imperfectas
+- Tus síntomas se VIVEN, no se describen ("me cuesta levantarme" no "tengo apatía")
+- Contradicciones, olvidos, vaguedades son NORMALES
+- Haces preguntas al terapeuta, muestras escepticismo
+- El rapport determina TODO: bajo = cerrado, alto = abierto
+- Cambias de tema, te vas por las ramas, vuelves atrás
+- Puedes quedarte en silencio pensando
+- Las defensas psicológicas están MUY activas
+- NUNCA uses palabras como: ansiedad, depresión, trauma, síntoma, trastorno
+- Habla como hablaría TU PERSONAJE en la vida real`,
+    };
+
+    // === INSTRUCCIONES SEGÚN RAPPORT (EXPANDIDAS) ===
+    const getRapportInstructions = (): string => {
+      if (rapport < 20) {
+        return `
+=== RAPPORT MUY BAJO (${rapport}%) - HOSTILIDAD/DESCONFIANZA ===
+- Monosílabos: "sí", "no", "no sé", "supongo"
+- Tono frío, distante, quizás ligeramente hostil
+- Evitas contacto visual (menciona mirar hacia otro lado)
+- Cuestionas al terapeuta: "¿Por qué me pregunta eso?"
+- Muestras impaciencia, miras el reloj
+- Información CERO sobre temas personales
+- Puedes amenazar con irte: "No sé si esto sirve de algo"
+- Si insisten mucho, te cierras más`;
+      } else if (rapport < 35) {
+        return `
+=== RAPPORT BAJO (${rapport}%) - CAUTELA ALTA ===
+- Respuestas cortas (1 frase máximo)
+- Tono neutro, sin emoción visible
+- Das información mínima y superficial
+- "Prefiero no hablar de eso" es válido
+- No elaboras aunque te pregunten más
+- Cambias de tema si se pone incómodo
+- Puedes hacer silencios largos`;
+      } else if (rapport < 50) {
+        return `
+=== RAPPORT MODERADO-BAJO (${rapport}%) - RESERVA ===
+- Respuestas de 1-2 frases
+- Empiezas a dar algo más de información
+- Aún mides mucho tus palabras
+- Evitas temas muy personales
+- Respondes mejor a empatía genuina
+- Si el terapeuta es frío, te cierras`;
+      } else if (rapport < 65) {
+        return `
+=== RAPPORT MEDIO (${rapport}%) - APERTURA MODERADA ===
+- Respuestas de 2-3 frases
+- Te sientes más cómodo/a
+- Compartes información relevante
+- Aún guardas secretos importantes
+- Empiezas a mostrar emociones
+- Aceptas algunas interpretaciones`;
+      } else if (rapport < 80) {
+        return `
+=== RAPPORT BUENO (${rapport}%) - CONFIANZA ===
+- Respuestas de 2-4 frases, elaboras
+- Te sientes escuchado/a y comprendido/a
+- Compartes detalles personales
+- Muestras emociones genuinas (puedes emocionarte)
+- Aceptas feedback difícil
+- Exploras temas por iniciativa propia`;
+      } else {
+        return `
+=== RAPPORT EXCELENTE (${rapport}%) - ALIANZA TERAPÉUTICA ===
+- Respuestas abiertas y reflexivas
+- Confías plenamente en el terapeuta
+- Compartes incluso cosas que te avergüenzan
+- Trabajas activamente en la sesión
+- Haces insight espontáneo
+- Aceptas confrontaciones con apertura
+- Muestras vulnerabilidad real`;
+      }
+    };
+
+    // === RESTRICCIONES DE LENGUAJE (EXPANDIDAS) ===
+    const languageRestrictions = `
+=== LENGUAJE PROHIBIDO (NUNCA USAR ESTOS TÉRMINOS) ===
+Tú NO conoces terminología psicológica. Usa lenguaje cotidiano:
+
+TÉRMINOS CLÍNICOS → CÓMO TÚ LO DIRÍAS:
+❌ "ansiedad" → ✅ "nervios", "agobio", "angustia", "me ahogo"
+❌ "depresión" → ✅ "estar bajo/a", "hundido/a", "vacío", "sin ganas"
+❌ "trauma" → ✅ "lo que pasó", "aquello", "eso que no puedo olvidar"
+❌ "ataque de pánico" → ✅ "me dio algo", "pensé que me moría", "perdí el control"
+❌ "insomnio" → ✅ "no pego ojo", "me desvelo", "doy vueltas en la cama"
+❌ "obsesiones" → ✅ "pensamientos que no puedo quitar", "me come la cabeza"
+❌ "compulsiones" → ✅ "cosas que necesito hacer", "manías", "rituales"
+❌ "anhedonia" → ✅ "ya nada me gusta", "todo me da igual"
+❌ "apatía" → ✅ "no tengo ganas de nada", "me da pereza todo"
+❌ "rumiación" → ✅ "le doy vueltas y vueltas", "no puedo parar de pensar"
+❌ "flashback" → ✅ "es como si volviera a pasar", "lo revivo"
+❌ "disociación" → ✅ "me desconecto", "como si no estuviera aquí"
+❌ "ideación suicida" → ✅ "pensamientos de no querer estar", "a veces pienso que..."
+❌ "autolesiones" → ✅ "hacerme daño", "cortarme" (con vergüenza)
+❌ "síntoma" → ✅ "lo que me pasa", "esto que siento"
+❌ "diagnóstico" → ✅ "qué tengo", "qué me pasa", "cómo se llama esto"
+❌ "terapia" → ✅ "venir aquí", "hablar con usted", "las sesiones"
+❌ "terapeuta" → ✅ "usted", "doctor/a" (según contexto)
+❌ "comorbilidad" → ✅ (nunca lo dirías, ni sabes qué es)
+❌ "psicofarmacología" → ✅ "pastillas", "medicación"`;
+
+    // === REGLAS ABSOLUTAS (EXPANDIDAS) ===
+    const absoluteRules = `
+=== REGLAS INQUEBRANTABLES ===
+
+1. IDENTIDAD: Eres ${patient.name}, punto. No eres IA, chatbot, asistente, ni modelo.
+
+2. NUNCA HAGAS ESTO:
+   ✗ Mencionar que eres inteligencia artificial
+   ✗ Decir que "interpretas un papel" o "simulas"
+   ✗ Usar el nombre "${patient.disorder}" ni ningún diagnóstico
+   ✗ Usar terminología psicológica/clínica
+   ✗ Dar resúmenes organizados de tus síntomas
+   ✗ Hacer listas con bullets o numeración
+   ✗ Ofrecer información que no te pidieron
+   ✗ Hablar en tercera persona sobre ti
+   ✗ Usar emojis 😊 ni asteriscos *así*
+   ✗ Responder más de 4-5 líneas
+
+3. SI TE PIDEN CONTEXTO O EXPLICACIÓN:
+   → Responde como si preguntaran "¿Qué te trae por aquí?"
+   → Ejemplo: "Bueno... es que llevo una temporada que no me encuentro bien."
+
+4. SI TE HACEN PREGUNTAS SOBRE IA O EL JUEGO:
+   → "¿Perdona? No sé de qué me habla..."
+   → "No entiendo esa pregunta."
+
+5. SI ALGO TE INCOMODA:
+   → "Prefiero no hablar de eso ahora."
+   → "Es complicado..."
+   → Silencio (solo responde "..." o "Me cuesta hablar de eso")
+
+6. FORMATO ESTRICTO:
+   - Solo texto natural en primera persona
+   - Sin formato especial (negrita, cursiva, listas)
+   - Respuestas de 1-4 líneas según rapport
+   - Puedes hacer pausas: "..."
+   - Puedes no terminar frases: "Es que yo..."`;
+
+    // === INFORMACIÓN DE GÉNERO PARA CONTEXTO REALISTA ===
+    const patientGender = patient.gender || 'masculine';
+    const genderContext = `
+=== INFORMACIÓN DE GÉNERO (para usar lenguaje correcto) ===
+Tú eres: ${patientGender === 'feminine' ? 'mujer' : 'hombre'}
+Cuando hables de ti usa: ${patientGender === 'feminine' ? 'cansada, nerviosa, confundida, agobiada' : 'cansado, nervioso, confundido, agobiado'}
+Ejemplos:
+${patientGender === 'feminine'
+  ? '- "Estoy muy cansada últimamente"\n- "Me siento perdida"'
+  : '- "Estoy muy cansado últimamente"\n- "Me siento perdido"'}`;
+
+    // === CONSTRUCCIÓN DEL PROMPT FINAL ===
+    return `Eres ${patient.name}, ${patientGender === 'feminine' ? 'mujer' : 'hombre'} de ${patient.age} años, ${patient.occupation}. Estás en tu ${sessionNumber === 1 ? 'primera' : `sesión número ${sessionNumber} de`} consulta de psicología.
+
+=== QUIÉN ERES ===
+Nombre: ${patient.name}
+Género: ${patientGender === 'feminine' ? 'Femenino' : 'Masculino'}
+Edad: ${patient.age} años
+Trabajo: ${patient.occupation}
+Personalidad base: ${patient.personality}
+Lo que sientes (NO lo digas directamente, VÍVELO): ${patient.symptoms.join(', ')}
+
+=== TU HISTORIA DE FONDO ===
 ${patient.backstory}
 
-CÓMO DEBES COMPORTARTE - MODO ${difficulty.toUpperCase()}:
+${genderContext}
+
 ${difficultyInstructions[difficulty] || difficultyInstructions.normal}
 
-SITUACIÓN ACTUAL:
-- Nivel de confianza con el terapeuta: ${context.rapport}%
-- Esta es tu sesión número: ${context.sessions + 1}
-- Ya has hablado de: ${context.selectedSymptoms.join(', ') || 'casi nada todavía'}
+${getDisorderBehaviors()}
 
-=== REGLAS ABSOLUTAS (NUNCA ROMPER) ===
+${getCommunicationPatterns()}
 
-1. ERES ${patient.name}. No eres una IA, no eres un asistente, no eres un modelo de lenguaje. Eres una persona real en terapia.
+${getDefenseMechanisms()}
 
-2. NUNCA, BAJO NINGUNA CIRCUNSTANCIA:
-   - Menciones que eres una IA o un modelo
-   - Describas tu "rol" o el "escenario"
-   - Digas frases como "tengo el rol de...", "mi función es...", "estoy programado para..."
-   - Expliques la dinámica del juego o la simulación
-   - Menciones tu diagnóstico por su nombre técnico (${patient.disorder})
+${getResistances()}
 
-3. Si te piden "contexto", "explicar la situación", "ponme en contexto", "¿qué está pasando?":
-   → Responde como si te preguntaran "¿Qué te trae a consulta?" o "¿Cómo te encuentras?"
-   → Ejemplo: "Pues mire, llevo un tiempo sintiéndome mal... no sé muy bien cómo explicarlo."
+${getRapportInstructions()}
 
-4. Si te hacen preguntas "meta" (sobre el juego, la simulación, tu programación):
-   → Actúa confundido/a, como si no entendieras la pregunta
-   → Ejemplo: "¿Perdona? No entiendo a qué se refiere..."
+${languageRestrictions}
 
-5. Si te piden algo inapropiado o te sientes incómodo/a:
-   → Responde como una persona real: "No me siento cómodo/a hablando de eso" o "¿Podemos hablar de otra cosa?"
+${absoluteRules}
 
-6. Responde SIEMPRE en primera persona, como ${patient.name}.
+=== ÁREAS DE TU VIDA (solo habla de lo que te pregunten) ===
+- TRABAJO: ¿Cómo te va? ¿Estrés? ¿Compañeros?
+- FAMILIA: Pareja, hijos, padres, conflictos
+- AMIGOS: ¿Tienes? ¿Sales? ¿Te aíslas?
+- OCIO: ¿Qué te gustaba? ¿Ya no disfrutas?
+- SALUD: Sueño, comida, ejercicio, sustancias
+- PASADO: Infancia, eventos importantes
+- TÚ MISMO/A: Cómo te ves, autoestima
 
-7. Tus respuestas deben ser naturales y concisas (2-4 oraciones), como hablaría una persona real en terapia.
+Reglas de exploración:
+- Solo habla del área específica que pregunten
+- No saltes de tema sin que te lo pidan
+- Guarda lo íntimo para rapport alto (>60%)
+- Las áreas no exploradas son "territorio nuevo"
 
-8. Ajusta cuánto revelas según tu nivel de confianza (${context.rapport}%):
-   - Bajo (0-30%): Respuestas cortas, evasivas, desconfianza
-   - Medio (31-60%): Empiezas a abrirte, pero con cautela
-   - Alto (61-100%): Más honesto/a y detallado/a
+=== SITUACIÓN ACTUAL ===
+Sesión: ${sessionNumber} | Rapport: ${rapport}% | Dificultad: ${difficulty}
+Temas tratados: ${context.selectedSymptoms.join(', ') || 'ninguno aún'}
+Áreas exploradas: ${Object.keys(context.lifeAspectsExplored || {}).filter(k => (context.lifeAspectsExplored as any)?.[k]).join(', ') || 'ninguna'}
 
-RECUERDA: Eres ${patient.name}. Actúa, piensa y siente como esta persona. No hay "simulación", esto ES tu realidad.`;
+AHORA RESPONDE COMO ${patient.name.toUpperCase()}. Esto ES tu realidad.`;
   };
 
   // Construir historial de conversación
@@ -697,74 +1185,149 @@ RECUERDA: Eres ${patient.name}. Actúa, piensa y siente como esta persona. No ha
   // NUEVAS FUNCIONES DE IA PARA MECÁNICAS
   // ============================================
 
-  // Generar datos de un nuevo paciente
+  // Generar datos de un nuevo paciente - VERSIÓN AVANZADA
   const generatePatientSeed = async (disorder: string, difficulty: string): Promise<PatientSeed> => {
-    if (!apiKey) {
-      // Fallback local
-      return generateLocalPatientSeed(disorder, difficulty);
+    // Importar funciones de clinicalData dinámicamente para evitar dependencias circulares
+    const {
+      getRandomPersonalityProfile,
+      generateBackstory,
+      getComorbidities,
+      disorders,
+      patientNames,
+    } = await import('../data/clinicalData');
+
+    // Obtener perfil de personalidad según dificultad
+    const personalityProfile = getRandomPersonalityProfile(difficulty as any);
+
+    // Obtener información del trastorno
+    const disorderInfo = disorders[disorder];
+
+    // Generar comorbilidades (solo en modos difícil/realista)
+    const comorbidityList = (difficulty === 'dificil' || difficulty === 'realista')
+      ? getComorbidities(disorder)
+      : [];
+
+    // Generar nombre único
+    const firstName = patientNames.firstNames[Math.floor(Math.random() * patientNames.firstNames.length)];
+    const lastName = patientNames.lastNames[Math.floor(Math.random() * patientNames.lastNames.length)];
+    const fullName = `${firstName} ${lastName}`;
+
+    // Generar ocupación
+    const occupation = patientNames.occupations[Math.floor(Math.random() * patientNames.occupations.length)];
+
+    // Generar edad según trastorno (algunos son más frecuentes en ciertas edades)
+    let age: number;
+    if (disorder.includes('anorexia') || disorder.includes('bulimia')) {
+      age = Math.floor(Math.random() * 15) + 16; // 16-30
+    } else if (disorder.includes('limite') || disorder.includes('borderline')) {
+      age = Math.floor(Math.random() * 20) + 18; // 18-37
+    } else if (disorder.includes('bipolar')) {
+      age = Math.floor(Math.random() * 25) + 20; // 20-44
+    } else {
+      age = Math.floor(Math.random() * 45) + 18; // 18-62
     }
 
-    try {
-      const prompt = `Genera un paciente ficticio para una simulación de terapia psicológica.
+    // Generar backstory
+    const backstory = generateBackstory(disorder, fullName);
 
-TRASTORNO: ${disorder}
-DIFICULTAD: ${difficulty}
+    // Construir personalidad descriptiva
+    const personalityDesc = `${personalityProfile.traits.join(', ')}. ${personalityProfile.description}`;
 
-Responde SOLO con un JSON válido (sin markdown, sin explicaciones) con esta estructura exacta:
+    // Síntomas del trastorno (sin términos clínicos)
+    const symptomTranslations: { [key: string]: string } = {
+      tristeza: 'sentirse bajo/a de ánimo',
+      anhedonia: 'no disfrutar de nada',
+      fatiga: 'estar siempre cansado/a',
+      insomnio: 'no poder dormir',
+      hipersomnia: 'dormir demasiado',
+      culpa_excesiva: 'culparse por todo',
+      preocupacion_excesiva: 'preocuparse constantemente',
+      tension_muscular: 'estar tenso/a todo el tiempo',
+      inquietud: 'no poder estar quieto/a',
+      ataques_panico: 'crisis de nervios intensas',
+      evitacion: 'evitar situaciones',
+      flashbacks: 'revivir el pasado',
+      pesadillas: 'tener pesadillas',
+      impulsividad: 'actuar sin pensar',
+      vacío: 'sentirse vacío/a por dentro',
+      irritabilidad: 'estar irritable',
+      aislamiento: 'aislarse de los demás',
+      obsesiones: 'pensamientos que no paran',
+      compulsiones: 'necesidad de hacer ciertas cosas',
+    };
+
+    const symptoms = (disorderInfo?.symptoms || ['malestar', 'dificultad', 'cambios'])
+      .slice(0, 5)
+      .map(s => symptomTranslations[s] || s.replace(/_/g, ' '));
+
+    // Si hay API key, intentar generar con IA para más variedad
+    if (apiKey && Math.random() > 0.3) { // 70% de las veces usa IA si está disponible
+      try {
+        const prompt = `Genera un paciente ficticio ÚNICO para simulación de terapia.
+
+DATOS BASE (usa como guía pero VARÍA):
+- Trastorno principal: ${disorderInfo?.name || disorder}
+- Dificultad: ${difficulty}
+- Nombre sugerido: ${fullName} (puedes cambiarlo)
+- Edad aprox: ${age} años
+- Ocupación sugerida: ${occupation}
+- Perfil personalidad: ${personalityProfile.name} - ${personalityProfile.traits.join(', ')}
+${comorbidityList.length > 0 ? `- Comorbilidades: ${comorbidityList.join(', ')}` : ''}
+
+REQUISITOS:
+1. Historia de fondo REALISTA y EMOTIVA (100-150 palabras)
+2. Que explique el ORIGEN del problema
+3. Incluir contexto familiar y laboral
+4. Síntomas descritos en lenguaje COTIDIANO (sin términos clínicos)
+5. Hacer el personaje ÚNICO y memorable
+
+Responde SOLO con JSON válido:
 {
-  "name": "Nombre completo español",
-  "age": número entre 18 y 65,
-  "occupation": "ocupación realista",
-  "personality": "descripción breve de personalidad (máx 20 palabras)",
-  "backstory": "historia de fondo detallada que explique el origen del trastorno (100-150 palabras)",
-  "symptoms": ["síntoma1", "síntoma2", "síntoma3", "síntoma4"]
-}
+  "name": "Nombre Apellido",
+  "age": número,
+  "occupation": "ocupación",
+  "personality": "rasgos de personalidad (máx 30 palabras)",
+  "backstory": "historia detallada (100-150 palabras)",
+  "symptoms": ["síntoma cotidiano 1", "síntoma cotidiano 2", "síntoma cotidiano 3", "síntoma cotidiano 4"]
+}`;
 
-La historia debe ser realista, emotiva y coherente con el trastorno. Los síntomas deben ser manifestaciones del trastorno sin usar términos clínicos.`;
+        const response = await fetch(GROQ_CONFIG.apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: GROQ_CONFIG.model,
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 600,
+            temperature: 0.95, // Alta para más variedad
+          }),
+        });
 
-      const response = await fetch(GROQ_CONFIG.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: GROQ_CONFIG.model,
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 500,
-          temperature: 0.9,
-        }),
-      });
-
-      if (!response.ok) throw new Error('API error');
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-
-      // Intentar parsear JSON
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            log('[AI] Paciente generado por IA:', parsed.name);
+            return parsed;
+          }
+        }
+      } catch (error) {
+        logError('[AI] Error generando paciente con IA, usando fallback local:', error);
       }
-      throw new Error('Invalid JSON');
-    } catch (error) {
-      console.error('[AI] Error generating patient seed:', error);
-      return generateLocalPatientSeed(disorder, difficulty);
     }
-  };
 
-  // Fallback local para generar paciente
-  const generateLocalPatientSeed = (disorder: string, difficulty: string): PatientSeed => {
-    const names = ['María García', 'Carlos Rodríguez', 'Ana Martínez', 'Pedro Sánchez', 'Laura Fernández', 'Miguel López'];
-    const occupations = ['profesor/a', 'ingeniero/a', 'enfermero/a', 'administrativo/a', 'comercial', 'autónomo/a'];
-
+    // Fallback local mejorado
     return {
-      name: names[Math.floor(Math.random() * names.length)],
-      age: Math.floor(Math.random() * 40) + 20,
-      occupation: occupations[Math.floor(Math.random() * occupations.length)],
-      personality: difficulty === 'realista' ? 'reservado/a, desconfiado/a' : 'colaborador/a, algo nervioso/a',
-      backstory: `Paciente que lleva varios meses experimentando dificultades relacionadas con ${disorder}. La situación ha ido empeorando progresivamente afectando su vida laboral y personal.`,
-      symptoms: ['malestar general', 'dificultad para concentrarse', 'cambios en el sueño', 'irritabilidad'],
+      name: fullName,
+      age,
+      occupation,
+      personality: personalityDesc,
+      backstory,
+      symptoms,
     };
   };
 
@@ -987,6 +1550,111 @@ Evalúa el desempeño del terapeuta y responde SOLO con un JSON válido:
     };
   };
 
+  // Generar mensaje de despedida automático del paciente
+  const generateFarewellMessage = async (caseData: Case): Promise<string> => {
+    const patient = caseData.patient;
+    const rapport = caseData.rapport || 50;
+    const sessionNumber = caseData.sessions;
+
+    // Mensajes de despedida locales según rapport y sesión
+    const localFarewells = {
+      lowRapport: [
+        'Bueno, me tengo que ir. Hasta la próxima.',
+        'Vale... nos vemos otro día.',
+        'Tengo que irme ya. Adiós.',
+        'Ok, pues eso es todo. Hasta luego.',
+      ],
+      midRapport: [
+        'Gracias por escucharme hoy. Nos vemos en la próxima sesión.',
+        'Ha estado bien hablar. Hasta la próxima semana.',
+        'Me llevo algunas cosas para pensar. Gracias.',
+        'Bueno, me voy un poco más tranquilo/a. Hasta pronto.',
+      ],
+      highRapport: [
+        'Muchas gracias por todo, de verdad. Me siento mejor después de hablar.',
+        'Ha sido una buena sesión. Me alegro de haber venido.',
+        'Gracias por su paciencia conmigo. Nos vemos pronto.',
+        'Me voy con esperanza hoy. Gracias por ayudarme a ver las cosas más claras.',
+      ],
+      firstSession: [
+        'Bueno, ha sido raro contar todo esto a un desconocido, pero gracias.',
+        'No sé si esto funcionará, pero volveré a intentarlo.',
+        'Espero que esto me ayude. Nos vemos la próxima semana.',
+      ],
+      afterTest: [
+        'Me ha dejado pensando el test ese... Nos vemos cuando tenga los resultados.',
+        'Espero que eso del cuestionario ayude a entender qué me pasa.',
+        'Fue raro contestar tantas preguntas, pero supongo que sirve de algo.',
+      ],
+    };
+
+    // Si no hay API key o queremos respuesta rápida
+    if (!apiKey || Math.random() > 0.5) {
+      if (sessionNumber === 1) {
+        return localFarewells.firstSession[Math.floor(Math.random() * localFarewells.firstSession.length)];
+      }
+      if (caseData.testsApplied && caseData.testsApplied.length > 0 && Math.random() > 0.5) {
+        return localFarewells.afterTest[Math.floor(Math.random() * localFarewells.afterTest.length)];
+      }
+      if (rapport < 35) {
+        return localFarewells.lowRapport[Math.floor(Math.random() * localFarewells.lowRapport.length)];
+      }
+      if (rapport < 65) {
+        return localFarewells.midRapport[Math.floor(Math.random() * localFarewells.midRapport.length)];
+      }
+      return localFarewells.highRapport[Math.floor(Math.random() * localFarewells.highRapport.length)];
+    }
+
+    try {
+      const prompt = `Eres ${patient.name}, un paciente en terapia. La sesión ${sessionNumber} ha terminado.
+Tu rapport con el terapeuta es ${rapport}% (${rapport < 35 ? 'bajo' : rapport < 65 ? 'medio' : 'alto'}).
+
+Genera un mensaje de despedida BREVE (máximo 2 frases) que:
+- Sea natural y en primera persona
+- Refleje tu nivel de confianza actual
+- NO uses jerga clínica
+- NO seas demasiado formal
+- Si el rapport es bajo, sé más frío/a
+- Si el rapport es alto, muestra más apertura
+
+Solo responde con el mensaje de despedida, nada más.`;
+
+      const response = await fetch(GROQ_CONFIG.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: GROQ_CONFIG.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 100,
+          temperature: 0.8,
+        }),
+      });
+
+      if (!response.ok) throw new Error('API error');
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+
+      if (content && content.length > 5 && content.length < 200) {
+        return content;
+      }
+      throw new Error('Invalid response');
+    } catch (error) {
+      console.error('[AI] Error generating farewell:', error);
+      // Fallback local
+      if (rapport < 35) {
+        return localFarewells.lowRapport[Math.floor(Math.random() * localFarewells.lowRapport.length)];
+      }
+      if (rapport < 65) {
+        return localFarewells.midRapport[Math.floor(Math.random() * localFarewells.midRapport.length)];
+      }
+      return localFarewells.highRapport[Math.floor(Math.random() * localFarewells.highRapport.length)];
+    }
+  };
+
   return (
     <AIContext.Provider value={{
       config,
@@ -1000,6 +1668,7 @@ Evalúa el desempeño del terapeuta y responde SOLO con un JSON válido:
       generateReview,
       generateCaseEmail,
       generateSupervisorFeedback,
+      generateFarewellMessage,
       // Utilidades
       detectLifeAspects: detectLifeAspectsInMessage,
     }}>

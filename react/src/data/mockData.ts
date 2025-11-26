@@ -236,6 +236,7 @@ export const generatePatientForDifficulty = (
   return {
     id: `patient_${randomSeed}`,
     name: patientInfo.name,
+    gender: patientInfo.gender,
     age: patientInfo.age,
     occupation: patientInfo.occupation,
     avatar: patientInfo.avatar,
@@ -258,6 +259,90 @@ export const mockPatients: Patient[] = [
   generatePatientForDifficulty('realista', 1007),
   generatePatientForDifficulty('realista', 1008),
 ];
+
+// ============================================================================
+// GENERACIÓN DE PACIENTES ÚNICOS (SIN REPETICIÓN)
+// ============================================================================
+
+// Conjunto de seeds ya usados para evitar repetición
+let usedSeeds: Set<number> = new Set();
+let usedNames: Set<string> = new Set();
+
+// Resetear el tracking de pacientes (útil al iniciar nueva sesión)
+export const resetPatientTracking = () => {
+  usedSeeds = new Set();
+  usedNames = new Set();
+};
+
+// Registrar pacientes existentes (para evitar repetir con casos activos)
+export const registerExistingPatients = (patientNames: string[]) => {
+  patientNames.forEach(name => usedNames.add(name.toLowerCase()));
+};
+
+// Generar un paciente único sin repetir nombres
+export const generateUniquePatient = (
+  difficulty: 'entrenamiento' | 'normal' | 'dificil' | 'realista',
+  existingPatientNames: string[] = []
+): Patient => {
+  // Registrar nombres existentes
+  existingPatientNames.forEach(name => usedNames.add(name.toLowerCase()));
+
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    // Generar seed único basado en tiempo + random
+    const seed = Date.now() + Math.floor(Math.random() * 1000000) + attempts;
+
+    // Evitar seeds repetidos
+    if (usedSeeds.has(seed)) {
+      attempts++;
+      continue;
+    }
+
+    // Generar paciente con este seed
+    const patient = generatePatientForDifficulty(difficulty, seed);
+
+    // Verificar que el nombre no esté usado
+    if (!usedNames.has(patient.name.toLowerCase())) {
+      // Marcar como usado
+      usedSeeds.add(seed);
+      usedNames.add(patient.name.toLowerCase());
+      return patient;
+    }
+
+    attempts++;
+  }
+
+  // Si fallamos muchas veces, generar con seed muy aleatorio (fallback)
+  const fallbackSeed = Date.now() * Math.random() * 1000;
+  const patient = generatePatientForDifficulty(difficulty, fallbackSeed);
+  usedSeeds.add(fallbackSeed);
+  usedNames.add(patient.name.toLowerCase());
+  return patient;
+};
+
+// Generar múltiples pacientes únicos para emails
+export const generateUniquePatientSet = (
+  count: number,
+  existingPatientNames: string[] = []
+): Patient[] => {
+  const patients: Patient[] = [];
+  const difficulties: Array<'entrenamiento' | 'normal' | 'dificil' | 'realista'> = [
+    'normal', 'dificil', 'realista', 'entrenamiento'
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const difficulty = difficulties[i % difficulties.length];
+    const patient = generateUniquePatient(difficulty, [
+      ...existingPatientNames,
+      ...patients.map(p => p.name)
+    ]);
+    patients.push(patient);
+  }
+
+  return patients;
+};
 
 // Videos de PsykTok
 export const psykTokVideos: PsykTokVideo[] = [

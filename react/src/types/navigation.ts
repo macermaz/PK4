@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Mail: undefined;
   Contacts: undefined;
   Diagnosis: { caseId: string };
+  DiagnosticTool: undefined;
   Treatment: { caseId: string };
   PsykTok: undefined;
   Diary: undefined;

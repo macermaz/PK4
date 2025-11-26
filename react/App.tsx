@@ -1,3 +1,5 @@
+// Required side-effect import: gesture handler
+import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -8,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // Importar contextos
 import { AppProvider } from './src/contexts/AppContext';
 import { AIProvider } from './src/contexts/AIContext';
+import { NotificationProvider } from './src/contexts/NotificationContext';
 
 // Importar pantallas
 import LockScreen from './src/screens/LockScreen';
@@ -17,6 +20,7 @@ import ChatScreen from './src/screens/ChatScreen';
 import MailScreen from './src/screens/MailScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import DiagnosisScreen from './src/screens/DiagnosisScreen';
+import DiagnosticToolScreen from './src/screens/DiagnosticToolScreen';
 import PsykTokScreen from './src/screens/PsykTokScreen';
 import DiaryScreen from './src/screens/DiaryScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
@@ -27,6 +31,11 @@ import TreatmentScreen from './src/screens/TreatmentScreen';
 import { RootStackParamList } from './src/types/navigation';
 
 const Stack = createStackNavigator<RootStackParamList>();
+// Temporary workaround: some @react-navigation types require an `id` prop
+// depending on versions of React/React Native. Use a loosely-typed alias
+// for the Navigator to avoid a TypeScript overload mismatch until
+// dependencies are aligned (downgrade React or upgrade navigation types).
+const StackNavigator: any = Stack.Navigator;
 
 export default function App() {
   return (
@@ -34,13 +43,14 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AppProvider>
           <AIProvider>
+            <NotificationProvider>
             <NavigationContainer>
               <StatusBar 
                 style="light" 
                 backgroundColor="transparent" 
                 translucent 
               />
-              <Stack.Navigator
+              <StackNavigator
                 initialRouteName="LockScreen"
                 screenOptions={{
                   headerShown: false,
@@ -74,13 +84,15 @@ export default function App() {
                 <Stack.Screen name="Mail" component={MailScreen} />
                 <Stack.Screen name="Contacts" component={ContactsScreen} />
                 <Stack.Screen name="Diagnosis" component={DiagnosisScreen} />
+                <Stack.Screen name="DiagnosticTool" component={DiagnosticToolScreen} />
                 <Stack.Screen name="Treatment" component={TreatmentScreen} />
                 <Stack.Screen name="PsykTok" component={PsykTokScreen} />
                 <Stack.Screen name="Diary" component={DiaryScreen} />
                 <Stack.Screen name="Results" component={ResultsScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
-              </Stack.Navigator>
+              </StackNavigator>
             </NavigationContainer>
+            </NotificationProvider>
           </AIProvider>
         </AppProvider>
       </GestureHandlerRootView>

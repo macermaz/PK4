@@ -6,7 +6,12 @@
       "Bash(npm install:*)",
       "Bash(npx expo start)",
       "Bash(npx expo start:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(taskkill:*)",
+      "Bash(cat:*)",
+      "Bash(timeout:*)",
+      "Bash(exit 0)",
+      "Bash(npx madge:*)"
     ],
     "deny": [],
     "ask": []
